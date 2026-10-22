@@ -2,10 +2,11 @@
 # Undo: TV_HOST=<tv ip> tools/restore.ps1 work/mitv-mooq0-session.txt
 # Disabled for user 0, never uninstalled.
 #
-# Owner asked to keep: YouTube, YouTube Music, Spotify, Jellyfin, VLC, and the sideloaded
-# file tools (FX, CX File Explorer, Send Files to TV, LocalSend), Aerial Views, Dreamy, BrowseHere.
+# Owner asked to keep: YouTube, YouTube Music, Spotify, Jellyfin, VLC, JioHotstar (re-enabled
+# 2026-10-22), and the sideloaded file tools (FX, CX File Explorer, Send Files to TV, LocalSend),
+# Aerial Views, Dreamy, BrowseHere.
 # Dock: Live TV, YouTube, Spotify, Jellyfin, VLC, FX.
-# Left unticked, so disabled: Netflix, Prime Video, JioHotstar, SonyLIV, JioTV, Jio on-demand,
+# Left unticked, so disabled: Netflix, Prime Video, SonyLIV, JioTV, Jio on-demand,
 # Mi TV+, Play Movies, Google Assistant, Chromecast, Miracast/Smart Share/Mi Cast,
 # the firmware updater, and the built-in Mi USB players.
 # com.mitv.dream and com.google.android.backdrop are added only after the new launcher's
@@ -44,9 +45,9 @@ com.google.android.play.games
 com.duokan.factorytest
 
 # ---- Streaming and store apps the owner does not use ----
+# in.startv.hotstar is kept: the owner reinstalled and enabled JioHotstar on 2026-10-22.
 com.netflix.ninja
 com.amazon.amazonvideo.livingroom
-in.startv.hotstar
 com.sonyliv
 com.jio.web.androidtv
 com.jio.media.stb.ondemand
