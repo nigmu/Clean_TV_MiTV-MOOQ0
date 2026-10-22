@@ -10,13 +10,8 @@
 # push it talks about (that is what left #670 and #730 stale). Every 6 hours a sweep re-reviews any open PR whose
 # review is older than its head commit; the first sweep also redoes the v1 reviews once (about $2.50).
 name: maintainer-bot
+# Manual only. This used to run on pull requests, comments, and every six hours.
 on:
-  pull_request_target:
-    types: [opened, synchronize, reopened, ready_for_review]
-  issue_comment:
-    types: [created]
-  schedule:
-    - cron: "23 */6 * * *"
   workflow_dispatch:
     inputs:
       pr:

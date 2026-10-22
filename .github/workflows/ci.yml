@@ -1,9 +1,8 @@
 name: CI
 
+# Manual only. A push to main used to start this on every commit.
 on:
-  push:
-    branches: [main]
-  pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read

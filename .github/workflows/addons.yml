@@ -2,12 +2,9 @@ name: Add-ons
 
 # Builds only what changed under addons/. Separate from CI on purpose: an add-on can't block or
 # slow the launcher's build, and the launcher's size gate never sees add-on code.
+# Manual only. A push that touched addons/ used to start this.
 on:
-  pull_request:
-    paths: ["addons/**"]
-  push:
-    branches: [main]
-    paths: ["addons/**"]
+  workflow_dispatch:
 
 permissions:
   contents: read
