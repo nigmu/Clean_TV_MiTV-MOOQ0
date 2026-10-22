@@ -7,84 +7,151 @@
 <style>
   :root {
     color-scheme: dark;
-    --bg: #101114;
-    --card: #1a1d23;
-    --line: #2c313a;
-    --text: #ece8e1;
-    --muted: #9b968c;
-    --accent: #d7c4a3;
-    --ok: #8fbfa2;
-    --warn: #d2a36a;
-    --bad: #d48a7a;
+    --bg: #0b0f16;
+    --card: #151b26;
+    --line: rgba(232, 238, 246, 0.09);
+    --text: #f2f5f8;
+    --muted: #9aa6b5;
+    --faint: #6e7c8e;
+    --accent: #79b8ff;
+    --live: #3dcc9a;
+    --warn: #e3b15a;
+    --bad: #f07178;
   }
   * { box-sizing: border-box; }
+  html, body { margin: 0; }
   body {
-    margin: 0;
-    background: var(--bg);
+    min-height: 100vh;
+    background:
+      radial-gradient(880px 380px at 100% -12%, rgba(121, 184, 255, 0.08), transparent 55%),
+      var(--bg);
     color: var(--text);
-    font: 15px/1.4 "Segoe UI", sans-serif;
+    font: 15px/1.45 "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
   }
   main {
-    max-width: 1080px;
+    max-width: 980px;
     margin: 0 auto;
-    padding: 28px 22px 40px;
+    padding: 44px 28px 64px;
   }
-  header {
-    display: flex;
-    justify-content: space-between;
-    gap: 16px;
-    align-items: baseline;
-    margin-bottom: 22px;
+  .top {
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.2fr) auto;
+    gap: 28px;
+    align-items: end;
+    margin-bottom: 28px;
+  }
+  .eyebrow {
+    margin: 0 0 6px;
+    color: var(--faint);
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
   }
   h1 {
     margin: 0;
+    font-size: 28px;
+    font-weight: 560;
+    letter-spacing: -0.03em;
+  }
+  .quiet { margin: 6px 0 0; color: var(--muted); font-size: 13px; }
+  .now-name {
+    margin: 0;
     font-size: 22px;
-    font-weight: 600;
+    font-weight: 560;
     letter-spacing: -0.02em;
   }
-  .meta, .sub { color: var(--muted); font-size: 13px; }
   .meta { text-align: right; }
-  .dot {
-    display: inline-block;
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: var(--ok);
-    margin-right: 6px;
+  .live {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    margin: 0;
+    color: var(--live);
+    font-size: 13px;
   }
-  .dot.warn { background: var(--warn); }
-  .dot.bad { background: var(--bad); }
-  .cards {
+  .dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--live);
+    box-shadow: 0 0 0 4px rgba(61, 204, 154, 0.16);
+  }
+  .dot.warn { background: var(--warn); box-shadow: 0 0 0 4px rgba(227, 177, 90, 0.16); }
+  .dot.bad { background: var(--bad); box-shadow: 0 0 0 4px rgba(240, 113, 120, 0.16); }
+  .up {
+    margin: 8px 0 0;
+    font-size: 18px;
+    font-weight: 560;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+  }
+  .clock { margin: 2px 0 0; color: var(--faint); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .banner {
+    display: none;
+    margin: 0 0 16px;
+    padding: 12px 14px;
+    border-radius: 12px;
+    background: rgba(240, 113, 120, 0.12);
+    color: #ffd5d8;
+  }
+  .banner.show { display: block; }
+  .stats {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 12px;
+    grid-template-columns: 1.35fr 1fr 1fr;
+    gap: 14px;
+    align-items: start;
   }
   .card {
     background: var(--card);
     border: 1px solid var(--line);
-    border-radius: 12px;
-    padding: 14px 16px 16px;
-    min-height: 148px;
+    border-radius: 16px;
+    padding: 18px 18px 16px;
+    min-width: 0;
   }
-  .card.wide { grid-column: span 4; min-height: 0; }
-  .label {
-    color: var(--muted);
-    font-size: 12px;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-  }
+  .label { color: var(--faint); font-size: 12px; }
   .value {
-    margin: 6px 0 2px;
-    font-size: 34px;
+    margin: 8px 0 0;
+    font-size: 40px;
+    font-weight: 560;
+    letter-spacing: -0.045em;
+    line-height: 1;
     font-variant-numeric: tabular-nums;
-    letter-spacing: -0.03em;
   }
-  .value small { font-size: 16px; color: var(--muted); font-weight: 400; }
-  .detail { color: var(--muted); font-size: 13px; min-height: 1.4em; }
+  .value .unit {
+    margin-left: 6px;
+    font-size: 14px;
+    font-weight: 400;
+    letter-spacing: 0;
+    color: var(--muted);
+  }
+  .note { margin: 10px 0 0; color: var(--faint); font-size: 12px; }
+  svg.spark { display: block; width: 100%; height: 52px; margin-top: 16px; }
+  svg.spark .axis { stroke: rgba(232, 238, 246, 0.1); stroke-width: 1; }
+  svg.spark polygon { fill: rgba(121, 184, 255, 0.16); }
+  svg.spark polyline { fill: none; stroke: var(--accent); stroke-width: 1.75; stroke-linejoin: round; stroke-linecap: round; }
+  .load {
+    display: flex;
+    gap: 22px;
+    margin-top: 14px;
+  }
+  .load span { display: block; color: var(--faint); font-size: 11px; }
+  .load b { font-weight: 540; font-variant-numeric: tabular-nums; }
+  dl { margin: 16px 0 0; }
+  dl div {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 5px 0;
+    border-top: 1px solid var(--line);
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+  }
+  dt { color: var(--muted); }
+  dd { margin: 0; }
   .bar {
-    margin-top: 12px;
-    height: 6px;
-    background: #2a2e36;
+    margin-top: 16px;
+    height: 4px;
+    background: rgba(232, 238, 246, 0.1);
     border-radius: 99px;
     overflow: hidden;
   }
@@ -95,117 +162,202 @@
     background: var(--accent);
     border-radius: 99px;
   }
-  svg.spark { display: block; width: 100%; height: 36px; margin-top: 10px; }
-  svg.spark polygon { fill: rgba(215, 196, 163, 0.18); }
-  svg.spark polyline { fill: none; stroke: var(--accent); stroke-width: 2; }
-  table { width: 100%; border-collapse: collapse; margin-top: 8px; }
-  th, td {
-    text-align: left;
-    padding: 6px 0;
-    border-bottom: 1px solid var(--line);
-    font-variant-numeric: tabular-nums;
+  .panel {
+    margin-top: 14px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 8px;
   }
-  th { color: var(--muted); font-size: 12px; font-weight: 500; }
-  td.num, th.num { text-align: right; }
-  td.name { max-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .banner {
-    display: none;
-    margin-bottom: 12px;
+  .panel-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 10px 12px 6px;
+  }
+  .panel-head .label { font-size: 13px; color: var(--muted); }
+  .proc {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 4.8rem;
+    gap: 12px;
+    align-items: start;
     padding: 10px 12px;
-    border-radius: 8px;
-    background: #3a2a28;
-    color: #f0d2cb;
+    border-radius: 10px;
   }
-  .banner.show { display: block; }
-  @media (max-width: 800px) {
-    .cards { grid-template-columns: 1fr 1fr; }
-    .card.wide { grid-column: span 2; }
-    header { flex-direction: column; }
+  .proc.on { background: rgba(121, 184, 255, 0.1); }
+  .friendly { display: block; font-size: 14px; }
+  .pkg {
+    display: block;
+    margin-top: 1px;
+    color: var(--faint);
+    font-size: 12px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .track {
+    height: 3px;
+    margin-top: 8px;
+    background: rgba(232, 238, 246, 0.1);
+    border-radius: 99px;
+  }
+  .track > span {
+    display: block;
+    height: 100%;
+    width: 0;
+    background: var(--accent);
+    border-radius: 99px;
+  }
+  .rss {
+    padding-top: 1px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    font-size: 14px;
+  }
+  @media (max-width: 860px) {
+    .top, .stats { grid-template-columns: 1fr; }
     .meta { text-align: left; }
+    main { padding: 28px 16px 48px; }
   }
 </style>
 </head>
 <body>
 <main>
-  <header>
+  <header class="top">
     <div>
-      <h1 id="title">TV vitals</h1>
-      <div class="sub" id="focus">Waiting for the first sample…</div>
+      <p class="eyebrow">Vitals</p>
+      <h1 id="title">TV</h1>
+      <p class="quiet" id="identity">Waiting for the TV…</p>
+    </div>
+    <div>
+      <p class="eyebrow">On screen</p>
+      <p class="now-name" id="focus-name">—</p>
+      <p class="quiet" id="focus"></p>
     </div>
     <div class="meta">
-      <div><span class="dot" id="dot"></span><span id="status">connecting</span></div>
-      <div id="clock"></div>
+      <p class="live"><span class="dot" id="dot"></span><span id="status">connecting</span></p>
+      <p class="up" id="up">—</p>
+      <p class="clock" id="clock"></p>
     </div>
   </header>
   <div class="banner" id="banner"></div>
-  <section class="cards">
+  <section class="stats">
     <article class="card">
       <div class="label">CPU</div>
-      <div class="value" id="cpu">—</div>
-      <div class="detail" id="cpu-detail"></div>
-      <svg class="spark" viewBox="0 0 200 36" preserveAspectRatio="none"><polygon id="cpu-fill" points=""></polygon><polyline id="cpu-spark" points=""></polyline></svg>
+      <p class="value"><span id="cpu">—</span><span class="unit" id="cpu-unit"></span></p>
+      <svg class="spark" viewBox="0 0 200 52" preserveAspectRatio="none">
+        <line class="axis" x1="0" y1="51" x2="200" y2="51"></line>
+        <polygon id="cpu-fill" points=""></polygon>
+        <polyline id="cpu-spark" points=""></polyline>
+      </svg>
+      <div class="load" id="load" title="On this board the load average counts parked tuner and HDMI threads, so it stays high while the CPU is idle."></div>
+      <p class="note" id="cpu-detail"></p>
+      <p class="note">Load counts idle driver threads.</p>
     </article>
     <article class="card">
       <div class="label">Memory</div>
-      <div class="value" id="mem">—</div>
-      <div class="detail" id="mem-detail"></div>
-      <div class="detail" id="mem-extra"></div>
-      <div class="bar"><span id="mem-bar"></span></div>
+      <p class="value"><span id="mem">—</span><span class="unit">MB</span></p>
+      <div class="bar" title="Share of RAM that is not available to apps"><span id="mem-bar"></span></div>
+      <dl>
+        <div><dt>Total</dt><dd id="mem-detail">—</dd></div>
+        <div><dt>Available</dt><dd id="mem-avail">—</dd></div>
+        <div><dt>Cache</dt><dd id="mem-cache">—</dd></div>
+        <div><dt>Swap</dt><dd id="mem-swap">—</dd></div>
+      </dl>
     </article>
     <article class="card">
-      <div class="label">Storage · /data</div>
-      <div class="value" id="disk">—</div>
-      <div class="detail" id="disk-detail"></div>
-      <div class="bar"><span id="disk-bar"></span></div>
+      <div class="label">Storage</div>
+      <p class="value"><span id="disk">—</span><span class="unit">GB free</span></p>
+      <div class="bar" title="Share of internal storage in use"><span id="disk-bar"></span></div>
+      <dl>
+        <div><dt>Used</dt><dd id="disk-used">—</dd></div>
+        <div><dt>Size</dt><dd id="disk-total">—</dd></div>
+      </dl>
     </article>
-    <article class="card">
-      <div class="label">Uptime</div>
-      <div class="value" id="up">—</div>
-      <div class="detail" id="up-detail"></div>
-    </article>
-    <article class="card wide">
-      <div class="label">Largest processes · RSS</div>
-      <table>
-        <thead><tr><th>Process</th><th class="num">Memory</th></tr></thead>
-        <tbody id="procs"></tbody>
-      </table>
-    </article>
+  </section>
+  <section class="panel">
+    <div class="panel-head">
+      <div class="label">Processes</div>
+      <div class="label">RSS</div>
+    </div>
+    <div id="procs"></div>
   </section>
 </main>
 <script>
 const cpuHist = [];
+const KNOWN = {
+  "com.gathin.tvhome": "Launcher",
+  "com.google.android.youtube.tv": "YouTube",
+  "com.google.android.youtube.tvmusic": "YouTube Music",
+  "com.spotify.tv.android": "Spotify",
+  "org.jellyfin.androidtv": "Jellyfin",
+  "org.videolan.vlc": "VLC",
+  "nextapp.fx": "FX",
+  "com.mediatek.wwtv.tvcenter": "Live TV",
+  "com.android.tv.settings": "Settings",
+  "com.google.android.gms": "Play services",
+  "com.google.android.gms.persistent": "Play services",
+  "com.google.android.gms.unstable": "Play services",
+  "com.google.process.gservices": "Play services",
+  "com.google.android.inputmethod.latin": "Keyboard",
+  "com.android.systemui": "System UI",
+  "com.android.bluetooth": "Bluetooth",
+  "com.android.vending": "Play Store",
+  "com.google.android.tv.remote.service": "Remote",
+  "system_server": "System server",
+  "xiaomi.tvservice": "Xiaomi TV",
+  "surfaceflinger": "Composer"
+};
 const $ = (id) => document.getElementById(id);
 
 function gb(kb) { return (kb / 1048576).toFixed(1) + " GB"; }
-function mb(kb) {
-  const n = kb / 1024;
-  return (n >= 100 ? n.toFixed(0) : n.toFixed(1)) + " MB";
+function mb(kb) { return Math.round(kb / 1024) + " MB"; }
+function pretty(name) {
+  const base = name.split(":")[0];
+  if (KNOWN[name]) return KNOWN[name];
+  if (KNOWN[base]) return KNOWN[base];
+  const tail = base.split(".").pop() || name;
+  return tail.charAt(0).toUpperCase() + tail.slice(1);
 }
 function uptime(seconds) {
   const s = Math.round(seconds);
-  const h = Math.floor(s / 3600);
+  const d = Math.floor(s / 86400);
+  const h = Math.floor((s % 86400) / 3600);
   const m = Math.floor((s % 3600) / 60);
+  if (d > 0) return d + "d " + h + "h";
   if (h > 0) return h + "h " + m + "m";
-  const sec = s % 60;
-  return m > 0 ? m + "m " + sec + "s" : sec + "s";
+  return m + "m " + (s % 60) + "s";
 }
 function spark(values) {
-  const nums = values.filter((v) => v != null);
-  if (nums.length < 2) return { line: "", fill: "" };
-  const max = Math.max(8, ...nums);
+  const ready = values.filter((v) => v != null);
+  if (ready.length < 2) return { line: "", fill: "" };
   const step = 200 / (values.length - 1);
   const line = values.map((v, i) => {
-    const y = v == null ? 34 : 34 - (v / max) * 32;
+    const y = v == null ? 50 : 50 - (Math.max(0, Math.min(100, v)) / 100) * 46;
     return (i * step).toFixed(1) + "," + y.toFixed(1);
   }).join(" ");
-  return { line, fill: "0,34 " + line + " 200,34" };
+  return { line, fill: "0,50 " + line + " 200,50" };
+}
+function loadRow(load) {
+  const host = $("load");
+  host.replaceChildren();
+  ["1 min", "5 min", "15 min"].forEach((label, i) => {
+    if (load[i] == null) return;
+    const cell = document.createElement("div");
+    const cap = document.createElement("span");
+    cap.textContent = label;
+    const num = document.createElement("b");
+    num.textContent = load[i].toFixed(1);
+    cell.append(cap, num);
+    host.append(cell);
+  });
 }
 
 function render(snap) {
   const dot = $("dot");
   if (!snap.ok) {
     dot.className = "dot bad";
-    $("status").textContent = "no sample";
+    $("status").textContent = "No sample";
     $("banner").textContent = snap.error || "The TV did not answer.";
     $("banner").className = "banner show";
     return;
@@ -213,60 +365,87 @@ function render(snap) {
   $("banner").className = "banner";
   const slow = snap.sample_ms > 500;
   dot.className = slow ? "dot warn" : "dot";
-  const gap = snap.interval_ms == null ? "first sample" : "every " + (snap.interval_ms / 1000).toFixed(2) + "s";
-  $("status").textContent = gap + " · read " + snap.sample_ms + " ms";
-  $("clock").textContent = new Date(snap.ts * 1000).toLocaleTimeString();
+  const gap = snap.interval_ms == null ? "Waiting" : "Live";
+  $("status").textContent = gap;
+  $("status").title = "Sample took " + snap.sample_ms + " ms";
+  $("clock").textContent = new Date(snap.ts * 1000).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 
   const dev = snap.device || {};
-  const bits = [dev.model, dev.device, dev.android ? "Android " + dev.android : "", dev.firmware]
-    .filter(Boolean);
-  $("title").textContent = bits.length ? bits[0] : "TV vitals";
+  const firmware = (dev.firmware || "").replace(/\s+(release|test)-keys$/, "");
+  $("title").textContent = dev.model || "TV";
+  document.title = (dev.model || "TV") + " vitals";
+  $("identity").textContent = [dev.android ? "Android " + dev.android : "", dev.device, firmware]
+    .filter(Boolean).join(" · ");
+
   const focus = snap.focus;
-  $("focus").textContent = focus
-    ? "On screen · " + focus.package + (focus.activity ? "  /  " + focus.activity.split(".").pop() : "")
-    : (bits.slice(1).join(" · ") || "No focused window");
+  if (focus) {
+    $("focus-name").textContent = pretty(focus.package);
+    const activity = focus.activity ? focus.activity.split(".").pop() : "";
+    $("focus").textContent = activity && activity !== "MainActivity"
+      ? focus.package + " · " + activity
+      : focus.package;
+  } else {
+    $("focus-name").textContent = "Nothing in front";
+    $("focus").textContent = "";
+  }
 
   const cpu = snap.cpu_percent;
-  $("cpu").innerHTML = cpu == null ? "—" : cpu.toFixed(1) + "<small> %</small>";
-  const load = (snap.load || []).map((n) => n.toFixed(1)).join("  ");
-  const threads = snap.threads == null ? "" : snap.running + " runnable · " + snap.threads + " threads";
-  $("cpu-detail").textContent = [load ? "load " + load : "", threads].filter(Boolean).join(" · ");
+  $("cpu").textContent = cpu == null ? "—" : cpu.toFixed(1);
+  $("cpu-unit").textContent = cpu == null ? "" : "%";
+  loadRow(snap.load || []);
+  const threads = snap.threads == null ? "" : snap.running + " runnable · " + snap.threads.toLocaleString("en-US") + " threads";
+  $("cpu-detail").textContent = threads;
   cpuHist.push(cpu);
   if (cpuHist.length > 60) cpuHist.shift();
   const trace = spark(cpuHist);
   $("cpu-spark").setAttribute("points", trace.line);
   $("cpu-fill").setAttribute("points", trace.fill);
 
-  const mem = snap.mem;
+  const mem = snap.mem || {};
   const memPct = mem.total_kb ? Math.round(100 * mem.used_kb / mem.total_kb) : 0;
-  $("mem").innerHTML = mb(mem.used_kb) + "<small> used</small>";
-  $("mem-detail").textContent = gb(mem.total_kb) + " total · " + mb(mem.available_kb) + " available";
-  $("mem-extra").textContent = mb(mem.free_kb) + " free · cache " + mb(mem.cache_kb) + " · swap " + mb(mem.swap_used_kb);
+  $("mem").textContent = mem.used_kb ? mb(mem.used_kb).replace(" MB", "") : "—";
+  $("mem-avail").textContent = mb(mem.available_kb || 0);
+  $("mem-cache").textContent = mb(mem.cache_kb || 0);
+  $("mem-swap").textContent = mb(mem.swap_used_kb || 0);
+  $("mem-detail").textContent = mem.total_kb ? gb(mem.total_kb) : "—";
   $("mem-bar").style.width = memPct + "%";
 
   const disk = snap.storage;
   if (disk) {
-    $("disk").innerHTML = gb(disk.free_kb) + "<small> free</small>";
-    $("disk-detail").textContent = gb(disk.used_kb) + " used of " + gb(disk.total_kb) + " · " + disk.use_percent + "%";
+    $("disk").textContent = gb(disk.free_kb).replace(" GB", "");
+    $("disk-used").textContent = gb(disk.used_kb);
+    $("disk-total").textContent = gb(disk.total_kb);
     $("disk-bar").style.width = disk.use_percent + "%";
   }
 
-  $("up").textContent = snap.uptime_s == null ? "—" : uptime(snap.uptime_s);
-  const devLine = [dev.android ? "Android " + dev.android : "", dev.firmware].filter(Boolean).join(" · ");
-  $("up-detail").textContent = devLine;
+  $("up").textContent = snap.uptime_s == null ? "—" : "Up " + uptime(snap.uptime_s);
 
-  const body = $("procs");
-  body.replaceChildren();
-  for (const proc of snap.processes || []) {
-    const tr = document.createElement("tr");
-    const name = document.createElement("td");
-    name.className = "name";
-    name.textContent = proc.name;
-    const num = document.createElement("td");
-    num.className = "num";
-    num.textContent = mb(proc.rss_kb);
-    tr.append(name, num);
-    body.append(tr);
+  const list = $("procs");
+  list.replaceChildren();
+  const rows = snap.processes || [];
+  const peak = rows.reduce((max, row) => Math.max(max, row.rss_kb), 1);
+  const focusPkg = focus ? focus.package : "";
+  for (const proc of rows) {
+    const row = document.createElement("div");
+    row.className = "proc" + (proc.name === focusPkg || proc.name.startsWith(focusPkg + ":") ? " on" : "");
+    const name = document.createElement("div");
+    const friendly = document.createElement("span");
+    friendly.className = "friendly";
+    friendly.textContent = pretty(proc.name);
+    const pkg = document.createElement("span");
+    pkg.className = "pkg";
+    pkg.textContent = proc.name;
+    const track = document.createElement("div");
+    track.className = "track";
+    const fill = document.createElement("span");
+    fill.style.width = Math.round(100 * proc.rss_kb / peak) + "%";
+    track.append(fill);
+    name.append(friendly, pkg, track);
+    const rss = document.createElement("div");
+    rss.className = "rss";
+    rss.textContent = mb(proc.rss_kb);
+    row.append(name, rss);
+    list.append(row);
   }
 }
 
@@ -274,7 +453,7 @@ const source = new EventSource("/events");
 source.onmessage = (ev) => render(JSON.parse(ev.data));
 source.onerror = () => {
   $("dot").className = "dot bad";
-  $("status").textContent = "reconnecting";
+  $("status").textContent = "Reconnecting";
 };
 </script>
 </body>
