@@ -62,13 +62,12 @@ share their TV's list afterwards, follow [Add a TV list](#add-a-tv-list) below.
 | Path | What it is |
 |---|---|
 | `PROMPT.md` | The prompt people paste into their agent. Brand-neutral; safety rules live here. |
-| `README.md` | Front page: quick start, supported TVs and the TV table, tools, launcher, restore, firmware updates, FAQ. `README.zh-CN.md` and `README.vi.md` are translations. |
+| `README.md` | Front page: quick start, supported TVs and the TV table, tools, launcher, restore, firmware updates, FAQ. English only. |
 | `CONTRIBUTING.md` | The contributor guide for people. "Where does my idea go?" is the routing table. |
 | `SECURITY.md` | Private vulnerability reporting. |
-| `SHOWCASE.md` | Projects built on this repo that live in their own repositories. |
 | `CODE_OF_CONDUCT.md` | Includes the rule against publishing device identifiers, Wi-Fi names and IPs. |
 | `examples/` | One folder per tested TV model: `debloat.txt`, sometimes a `README.md` and a `config.json`. Indexed in `examples/README.md`. |
-| `docs/` | `docs/TROUBLESHOOTING.md`, `docs/REMOTE.md` (another home, over Tailscale), `docs/modules.md` and `docs/specs/card.md` (module cards), `docs/PRESS.md`, `docs/devices/` for models with notes but no tested list, and `docs/workflows/` for multi-step methods (see [Workflows](#workflows)). |
+| `docs/` | `docs/TROUBLESHOOTING.md`, `docs/REMOTE.md` (another home, over Tailscale), `docs/modules.md` and `docs/specs/card.md` (module cards), `docs/PRESS.md`, and `docs/workflows/` for multi-step methods (see [Workflows](#workflows)). |
 | `launcher/` | The reference launcher, package `com.gathin.tvhome`: plain Java, AndroidX RecyclerView and DynamicAnimation, `minSdk` 26, no `INTERNET` permission. |
 | `themes/` | One folder per theme: `config.json`, a required `screenshot.jpg`, optional wallpapers. Keys are documented in `themes/README.md`. |
 | `addons/` | Optional module-card apps, each its own Gradle project, never built into the launcher. |
@@ -88,7 +87,7 @@ The core stays small on purpose. Pick the smallest home that fits (CONTRIBUTING,
 | A small launcher switch that is off by default | A pull request here: see [the switch recipe](#add-an-off-by-default-launcher-switch) |
 | A new look: colours, wallpaper, dock, columns, that existing config keys can carry | `themes/<name>/` |
 | A widget or tile that can be its own small app | `addons/<name>/`, as a module card that never touches `launcher/` |
-| A whole new launcher, a heavy restyle, a port to another platform, a lower `minSdk`, new permissions or network access, Fire TV Home takeover, a changed default for every TV | Your own repository, plus one row in `SHOWCASE.md` |
+| A whole new launcher, a heavy restyle, a port to another platform, a lower `minSdk`, new permissions or network access, Fire TV Home takeover, a changed default for every TV | Your own repository |
 | Safety rules in `PROMPT.md`, the Home-safety logic in the scripts, protected packages, CI and workflows, the APK size gate | Open an issue for the maintainer; do not change it in a PR |
 
 ### What gets merged, sent back or closed
@@ -114,7 +113,7 @@ Run the tests after every recipe: `python3 -m unittest discover -s tests -v` (se
 1. Check `examples/README.md` first. The same product code and firmware as an existing folder is usually a
    second unit or a re-badge: add your notes to that folder instead of a new one.
 2. Create `examples/<brand>-<model>/debloat.txt`, lower-case with hyphens. Copy the format of
-   `examples/xiaomi-mi-tv-4a/debloat.txt`:
+   `examples/xiaomi-mitv-mooq0/debloat.txt`:
    - The first line is a comment with the exact model, Android version and firmware build
      (`tools/tv.py --probe` prints them).
    - Then the Apply and Undo lines, the stock launcher and Live TV package if they differ, and what was kept and why.
@@ -131,8 +130,7 @@ Run the tests after every recipe: `python3 -m unittest discover -s tests -v` (se
    install or restore scripts, Private DNS or AdGuard setup, or `pm uninstall` steps: the folder only
    disables, and `tools/disable.sh` and `tools/restore.sh` do the rest.
 
-A model with notes but no several-day list goes in `docs/devices/<brand-model>.md`, with one line under the notes
-list at the end of `examples/README.md`. A folder in `examples/` must have packages in it.
+A folder in `examples/` must have packages in it.
 
 ### Update an existing list
 
@@ -141,20 +139,9 @@ Explain each added or re-enabled package in a comment. A list that disables the 
 header; keeping it enabled is preferred. `pm hide` or `pm block` needs the matching undo in the header. Edits to
 someone else's list are judgement calls, so say in the PR which TV you tested on and for how long.
 
-### Add a launcher translation
+### Languages
 
-1. Create `launcher/app/src/main/res/values-<qualifier>/strings.xml` and translate every string in
-   `launcher/app/src/main/res/values/strings.xml`, skipping the ones marked `translatable="false"`. Keep
-   placeholders (`%1$s`, `%d`) and XML escapes intact.
-2. Add the locale to `launcher/app/src/main/res/xml/locales_config.xml`.
-3. Add the language to the Languages list in `README.md`.
-4. To fix a missing string in existing locales, add it to every `values-*` folder you can, in the same order as
-   the default `strings.xml`. A missing string falls back to English (`launcher/app/lint.xml`), but a new switch
-   needs its strings in every locale.
-5. Moving hard-coded text into resources is welcome; do not bundle unrelated build changes with it.
-6. Build the launcher, set the TV's language (Android 13+: `tools/tv.py 'cmd locale set-app-locales com.gathin.tvhome --locales <tag>'`)
-   and attach a screenshot. Right-to-left languages mirror the layout like Hebrew; `tests/test_hebrew_resources.py`
-   checks that `layout-iw` keeps every view.
+This copy is English only. Launcher strings live in `launcher/app/src/main/res/values/strings.xml`, and `launcher/app/src/main/res/xml/locales_config.xml` lists `en`. Do not add other locales.
 
 ### Add an off-by-default launcher switch
 
@@ -165,8 +152,7 @@ The core takes a switch only if it changes nothing until a theme or `config.xml`
 2. Read it in `launcher/app/src/main/java/com/gathin/tvhome/Config.java`, from the resource and from the
    theme JSON, the way existing keys such as `show_stats` are read.
 3. Add a row to the Keys table in `themes/README.md`.
-4. If it adds a row to Launcher settings, put its strings in `launcher/app/src/main/res/values/strings.xml`
-   and every `values-*` folder.
+4. If it adds a row to Launcher settings, put its strings in `launcher/app/src/main/res/values/strings.xml`.
 5. With the key off, nothing new runs: no receiver, no service, no write, no permission grant in the install
    script. The bot checks this in the diff, not in the description.
 6. Add a JVM unit test under `launcher/app/src/test/java/com/gathin/tvhome/` for any logic that can be tested
@@ -203,15 +189,6 @@ no switch. No new dependencies in `launcher/app/build.gradle` without an issue f
 5. No APKs in the repo. `tests/test_addons.py` checks all of this; `.github/workflows/addons.yml` builds the
    add-ons that changed with `./gradlew --no-daemon assembleRelease`.
 
-### Add a showcase row
-
-1. Add one row to the section of `SHOWCASE.md` that fits (home screens, forks, screensavers and add-ons,
-   tools, other platforms), and the project under its TV brand in "Find a project by TV brand".
-2. Keep each cell to one line: what it is, what it was built and tested on, and the author.
-3. The project is open source with a link people can read and build, says which TV it was tested on, collects
-   nothing beyond what its README says, and is yours or listed with the author's blessing.
-4. Put a screenshot in the PR description; it is linked from the row.
-
 ### Add a press entry
 
 1. Add a row `| Outlet | [Headline](<url>) | Date |` to the right country section of `docs/PRESS.md`, in the
@@ -228,10 +205,9 @@ no switch. No new dependencies in `launcher/app/build.gradle` without an issue f
   problem). An entry is a bullet that opens with the symptom in bold, then the cause and the fix, naming the
   TV model and firmware it was seen on.
 - A fix for something your agent got stuck on usually belongs in `PROMPT.md` as one extra sentence, kept
-  brand-neutral. Brand-specific knowledge goes in `examples/` or `docs/devices/`. Changes to the safety rules
+  brand-neutral. Brand-specific knowledge goes in `examples/`. Changes to the safety rules
   themselves go to the maintainer.
-- Several tests pin facts in `docs/devices/` notes, `PROMPT.md` and `docs/TROUBLESHOOTING.md` (the
-  `tests/test_*_note.py` files). If you reword one of those passages, run the suite and keep the fact.
+- Several tests pin facts in `PROMPT.md` and `docs/TROUBLESHOOTING.md`. If you reword one of those passages, run the suite and keep the fact.
 - Docs and the README stay in step: a new list, theme, add-on or tool gets its row where the others are.
 
 ## Workflows
@@ -282,7 +258,7 @@ Never do these in a PR:
   launched.
 - **No root, no getting around app-store protection, no private builds** others cannot reproduce from this repo.
 - **No extras added to the PROMPT flow** beyond debloating and the launcher.
-- **Don't relax `minSdk`** (26) or the launcher's permissions; those are forks for `SHOWCASE.md`.
+- **Don't relax `minSdk`** (26) or the launcher's permissions. That belongs in a separate repository.
 
 ## Privacy and screenshots
 

@@ -47,7 +47,7 @@ TV_HOST=<tv ip> tools/venv/bin/python -I tools/tv.py 'pm install -r /data/local/
 - **Tested on a real TV.** Say which one in the README and in the table above.
 - **The author maintains it.** Issues about an add-on are assigned to its author. An add-on that
   breaks on current Android TV versions, or goes unmaintained, may be removed. Its history stays in
-  git, and you can keep it going in a fork listed in [`SHOWCASE.md`](../SHOWCASE.md).
+  git.
 
 ## Adding one
 

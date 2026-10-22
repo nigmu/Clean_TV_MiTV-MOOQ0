@@ -44,7 +44,7 @@ Things that bit us or contributors, so they don't bite you. Commands use `tools/
   TCL 65C735 the adapter came up as `eth1`. How long the port survives debugging differs by firmware:
   the two Xiaomi boxes lose it as soon as debugging is on, while the 65C735 kept the adapter until a
   reboot with debugging still on put the port in gadget mode (`sys.usb.config=adb`, `Mstar-udc`) and
-  it never came back ([that list's header](../examples/tcl-65c735/debloat.txt)). Either way there is
+  it never came back. Either way there is
   no way back from the shell on a set with no Wireless debugging, and switching USB debugging off
   stops `adbd` too, so plan one sitting rather than two: switch debugging off at the end, replug the
   adapter, and confirm Ethernet before handing the TV back. The launcher never needs debugging.
@@ -83,9 +83,7 @@ Things that bit us or contributors, so they don't bite you. Commands use `tools/
   route around it, sponsored rows stay on the home screen, and the only useful work left is the
   TV's own privacy toggles plus DNS blocking (Pi-hole with a smart-TV ad list; the report used
   Perflyst's `AmazonFireTV` list). Fire OS 6 is the opposite case: `pm disable-user` works and about
-  ten Amazon packages are protected, which
-  [`examples/amazon-fire-tv-stick-4k-2018/debloat.txt`](../examples/amazon-fire-tv-stick-4k-2018/debloat.txt)
-  lists, with the same DNS fallback for their endpoints.
+  ten Amazon packages are protected, with the same DNS fallback for their endpoints.
 - **The Input key and CEC die after the hidden factory menu is opened**, seen on a Haier/CVTE set
   (Durabrand `DURAT32ISDB`, `dupont`, Android TV 11 build `RTM6.230109.232`,
   [#470](https://github.com/Gathin23/cleanyourtv/issues/470)). `com.cvte.tv.hkcfac` is the
@@ -105,10 +103,9 @@ Things that bit us or contributors, so they don't bite you. Commands use `tools/
   tools/tv.py 'settings put global hdmi_control_enabled 1'
   ```
   Press the real Input button afterwards and check the packages are back:
-  `tools/tv.py 'pm list packages -e | grep -E "gms|netflix|mediashell|katniss"'`. More on the unit in
-  the [device notes](devices/durabrand-durat32isdb.md).
+  `tools/tv.py 'pm list packages -e | grep -E "gms|netflix|mediashell|katniss"'`.
 - **Stremio looks like its server died after the debloat**, seen on a Xiaomi MiTV-MZTU0 (`river`,
-  Google TV 14, [list](../examples/xiaomi-tv-a-pro-2026/debloat.txt)). The app opens, the add-ons
+  Google TV 14). The app opens, the add-ons
   load, and nothing ever plays, which reads like a local server fault. It is not: with
   `com.google.android.apps.mediashell` disabled, Stremio's own `stremio_server_process` is still
   running, still listening on 11470/12470, still holds ESTABLISHED connections to `api.strem.io`,
@@ -197,8 +194,7 @@ Things that bit us or contributors, so they don't bite you. Commands use `tools/
   stick because it left the saved setting empty. Put `settings --user 0 put secure
   display_density_forced 320` after it, reboot, and read all three lines back before believing it.
   Don't copy the number to another TV: record the three values first, and undo with `wm density reset`
-  plus `settings delete secure display_density_forced`. Device note:
-  [Sony K-85XR70](devices/sony-k85xr70-ae2.md).
+  plus `settings delete secure display_density_forced`.
 - **Disable the stock launcher only after the new one is installed**, or the Home button lands on
   a factory test app. Launch the replacement by hand first. `set-home-activity` can report
   `Success` while HOME still resolves to the stock launcher (priority 2) until that one is disabled.
@@ -234,7 +230,7 @@ Things that bit us or contributors, so they don't bite you. Commands use `tools/
   the set, so the batch size and the power cut were not the cause. Two things to carry away. First,
   the screen being stuck does not mean the set is gone: this one still answered ADB on Ethernet while
   it said `INICIALIZANDO`, and `pm enable` on every package from the pre-change backup plus a reboot
-  brought it back (the recovery steps are in the [device notes](devices/coop-cotv-0001.md)). Second, a
+  brought it back. Second, a
   vendor package that looks unrelated can be what the launcher runs on - here disabling `com.tsb.tv`
   stopped the launcher with "Se ha detenido la aplicación lancherProject" instead of breaking the
   boot - which is why a list goes on in batches with a reboot and a look at the screen between them,
@@ -249,7 +245,7 @@ Things that bit us or contributors, so they don't bite you. Commands use `tools/
   verified on MiTV-AETP0 (dofus), Android 9, firmware 22.9.2.851: the framework filters third-party
   HOME candidates by a package-name allowlist. Disabling the stock launcher then selects
   `FallbackHome`. An opt-in application-ID build worked with the stock launcher still enabled;
-  see the [device notes and rollback steps](devices/xiaomi-mitv-aetp0-dofus.md). This is different
+  the stock launcher has to stay enabled while that build is Home. This is different
   from a missing default-home picker or a remote that emits ALL_APPS.
 - **The new launcher still doesn't own Home** after the stock one is disabled, seen on Google TV
   (Xiaomi MiTV-MOOR2). Another system app answers HOME: `com.google.android.tungsten.setupwraith`,
@@ -281,10 +277,9 @@ Things that bit us or contributors, so they don't bite you. Commands use `tools/
   enough; forget the network first (Xiaomi MiTV-MOSR4, where this also switched USB debugging off).
 - **A reboot on setupwraith's recovery screen factory-reset the TV** (Xiaomi MiTV-MOSR4). Disable
   setupwraith before launcherx. If `mFocusedApp` shows `.RecoveryActivity`, re-enable launcherx
-  first and do not reboot. [Notes](devices/xiaomi-mitv-mosr4.md).
+  first and do not reboot.
 - **Black screen at every boot after the launcher change, LED on, remote dead** (Vision
-  2024VISION43STV, CVTE, Android 13: [its list](../examples/vision-2024vision43stv/debloat.txt) has the
-  details). With file-based encryption (`getprop ro.crypto.type` says `file`) Android starts Home before
+  2024VISION43STV, CVTE, Android 13). With file-based encryption (`getprop ro.crypto.type` says `file`) Android starts Home before
   the first unlock, and only a direct-boot-aware activity can start then. Most firmwares have a
   `FallbackHome` that stands in until the unlock; some, like this CVTE board, do not, and then boot
   never completes. This repo's launcher is direct-boot-aware; most other launchers are not. Check both
@@ -371,8 +366,7 @@ Things that bit us or contributors, so they don't bite you. Commands use `tools/
   missing while the process lives, the receiver is hung: the QM7 report saw its connections sitting
   in `CLOSE_WAIT` on 8009 with unread data. `tools/tv.py "am force-stop
   com.google.android.apps.mediashell"` restarts it (the TV starts it again on demand), and
-  advertising returned within seconds, without a reboot. Device notes:
-  [TCL 75QM751G](devices/tcl-75qm751g-qm7.md).
+  advertising returned within seconds, without a reboot.
 - **The TV drops off Wi-Fi every minute right after the install**, seen on Google TV 14 (Xiaomi
   MiTV-MZTU0): the same setupwraith `.RecoveryActivity` took Home and system_server crash-looped
   on it. The install script now starts the new launcher before disabling the stock one, sets the
@@ -505,8 +499,7 @@ running back on the list the next time it starts; a helper turned off in Setting
   A press that `logcat` reports as `KEY_UNKNOWN` or `KEY_PROGRAM` cannot be matched by keycode at all,
   because every unmapped button shares those codes: use the Linux scancode from
   `tools/tv.py 'getevent -lt'` in `settings_key_scancodes` and install with `HOME_KEY_SERVICE=1`
-  (an RC-36 remote sends its gear on scancode 240 and its notifications button on 362 that way; see
-  [the FPD CG50-C3 note](devices/fpd-cg50-c3.md)).
+  (an RC-36 remote sends its gear on scancode 240 and its notifications button on 362 that way).
   Not every set answers those two routes, though ([#853](https://github.com/Gathin23/cleanyourtv/issues/853),
   a PEAQ "AI PONT DE", `DVB99PQ` / Changhong `changi`, Google TV 14, `UKNV.260504.001`): a HID
   consumer-control usage prints an evdev `MSC_SCAN` that is not necessarily the `KeyEvent.getScanCode()`
@@ -524,7 +517,7 @@ running back on the list the next time it starts; a helper turned off in Setting
   to once the stock launcher is gone.
 - **All vendor buttons die at once** and `logcat` says `GLOBAL_BUTTON ... process is bad`: the
   global-key receiver crashes on the disabled launcherx and Android stops starting it. Map every such
-  keycode in the helpers, also for disabled apps. See [the MOSR4 note](devices/xiaomi-mitv-mosr4.md).
+  keycode in the helpers, also for disabled apps.
 
 A force-stop switches the helpers off for good: after `am force-stop com.gathin.tvhome` (or Force stop in
 Settings > Apps) Android removes the launcher's services from the enabled list, and they do not come back
@@ -623,4 +616,4 @@ This is a trade, not a defect to fix: the buttons the helpers exist for (a gear 
 home, so on a set whose list disabled launcherx only a helper can answer them. Either keep the repeat and
 install without `INPUT_KEY_SERVICE=1`/`HOME_KEY_SERVICE=1`, or keep the buttons and accept one step per
 press, or leave launcherx enabled and bind nothing. Write back the exact string the first read printed;
-the empty list also unbinds TalkBack. Bisect, keycodes and limits: [the G09 note](devices/tcl-55p71b-g09-key-repeat.md).
+the empty list also unbinds TalkBack.

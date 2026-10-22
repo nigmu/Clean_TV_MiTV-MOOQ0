@@ -12,7 +12,7 @@
 - [ ] Verified on a real TV, screenshot attached
 - [ ] D-pad checked from every edge (Up, Down, Left, Right)
 - [ ] No network, no background service, no new permission
-- [ ] New strings in `values/strings.xml` and the other `values-*` folders
+- [ ] New strings in `launcher/app/src/main/res/values/strings.xml`
 - [ ] Anything TV-specific is in `config.xml` or a theme, not in code
 
 ### If this adds or changes a theme

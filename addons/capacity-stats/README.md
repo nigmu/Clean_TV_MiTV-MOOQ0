@@ -9,7 +9,7 @@ No binaries or prebuilt APKs are committed.
 
 The launcher discovers the static module card and asks whether to show it. Opening the card shows
 live readings in this app. Module spec 1 has static captions: it cannot show live counters on Home.
-No launcher changes are required. English and Hebrew UI, standard locale direction for other languages.
+No launcher changes are required. The card UI is English.
 Reads refresh every ten seconds only while this screen is resumed; no background service survives leaving it.
 
 ## Permissions
@@ -22,4 +22,4 @@ as MemFree + Buffers + Cached, bounded by MemTotal. Missing/invalid values are o
 ## Validation
 
 Real Android TV 12 hardware; the owner's model and configuration are withheld for privacy.
-6 JVM tests, lintRelease and release build passed. On real hardware verified both RAM ratios, storage, Hebrew direction, module-card recognition and stopping the worker on Back.
+6 JVM tests, lintRelease and release build passed. On real hardware verified both RAM ratios, storage, module-card recognition and stopping the worker on Back.

@@ -7,7 +7,7 @@ import android.util.TypedValue;
 
 /**
  * The typeface behind one of the font_* strings in res/values/fonts.xml, for views built in code. The string
- * points at a bundled font, or, in locales Outfit can't draw (values-vi), names a system family (#833).
+ * points at a bundled font. English uses Outfit.
  */
 final class UiFont {
     private UiFont() {}

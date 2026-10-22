@@ -13,7 +13,7 @@ The launcher stays small on purpose, so pick the smallest home that fits:
 | A TV model, a fix, a translation, a small switch that is off by default | A pull request here (sections 1 to 3 below) |
 | A new look: colours, wallpaper, dock, columns | [`themes/`](themes/README.md), with a screenshot from a real TV |
 | A widget or tile that can be its own small app | [`addons/`](addons/README.md), as a module card; it never touches `launcher/` |
-| A whole new launcher, a heavy restyle, a port to another platform | Your own repo, plus one row in [`SHOWCASE.md`](SHOWCASE.md) (section 4) |
+| A whole new launcher, a heavy restyle, a port to another platform | Your own repo |
 
 Everything merged into `themes/` and `addons/` shows up on [cleanyour.tv/addons](https://cleanyour.tv/addons).
 
@@ -23,7 +23,7 @@ Every brand ships different bloat. If you ran the prompt (or did it by hand) on 
 `examples/`, add it:
 
 1. Create `examples/<brand>-<model>/debloat.txt`. Copy the format from
-   `examples/xiaomi-mi-tv-4a/debloat.txt`: one package per line, grouped with a comment that says
+   `examples/xiaomi-mitv-mooq0/debloat.txt`: one package per line, grouped with a comment that says
    what the group is, and a trailing comment on anything non-obvious ("re-enable for firmware
    updates", "needed for HDMI-CEC", etc.).
 2. Put the exact model name, Android version and firmware build in the header so people can tell
@@ -103,10 +103,7 @@ you find a cleaner workaround, open an issue first.
 ## 4. Show what you built
 
 Built your own launcher, a port to another platform, or an add-on that is too big or too personal
-for the shared launcher? Put it in its own repository and add one row to
-[`SHOWCASE.md`](SHOWCASE.md). That page is the place for alternative launchers, forks with a
-different look, and tools around the launcher; this repo keeps one small reference launcher and
-points at everything else. The rules for a row are on that page.
+for the shared launcher? Put it in its own repository. This repo keeps one small reference launcher.
 
 Things that stay in this repo: debloat lists, fixes and small, opt-in features for the reference
 launcher, prompt and tool improvements. A feature that can be its own small app goes in [`addons/`](addons/README.md)

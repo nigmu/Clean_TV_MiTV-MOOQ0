@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The UI fonts, looked up through these strings so a locale can swap in a system family: Outfit has no
-     glyphs for most Vietnamese accented letters, so values-vi points them at the system sans-serif (#833). -->
+<!-- The UI fonts. English uses the bundled Outfit family. -->
 <resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="ReferenceType">
     <string name="font_body" translatable="false">@font/outfit</string>
     <string name="font_regular" translatable="false">@font/outfit_regular</string>

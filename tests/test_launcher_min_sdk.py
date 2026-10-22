@@ -226,11 +226,9 @@ class Android7DocsTest(unittest.TestCase):
         self.assertIn("ro.build.version.sdk", self.prompt)
 
     def test_the_stale_min_sdk_24_row_is_gone(self):
-        rows = [line for line in EXAMPLES.read_text(encoding="utf-8").split("\n")
-                if line.startswith("| `sony-kd-55x8509c/`")]
-        self.assertEqual(len(rows), 1)
-        self.assertNotIn("minSdk 24", rows[0])
-        self.assertIn("minSdk 26", rows[0])
+        text = EXAMPLES.read_text(encoding="utf-8")
+        self.assertNotIn("minSdk 24", text)
+        self.assertNotIn("sony-kd-55x8509c", text)
 
 
 if __name__ == "__main__":
