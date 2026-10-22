@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TV vitals</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #101114;
+    --card: #1a1d23;
+    --line: #2c313a;
+    --text: #ece8e1;
+    --muted: #9b968c;
+    --accent: #d7c4a3;
+    --ok: #8fbfa2;
+    --warn: #d2a36a;
+    --bad: #d48a7a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 15px/1.4 "Segoe UI", sans-serif;
+  }
+  main {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 28px 22px 40px;
+  }
+  header {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    align-items: baseline;
+    margin-bottom: 22px;
+  }
+  h1 {
+    margin: 0;
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+  .meta, .sub { color: var(--muted); font-size: 13px; }
+  .meta { text-align: right; }
+  .dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--ok);
+    margin-right: 6px;
+  }
+  .dot.warn { background: var(--warn); }
+  .dot.bad { background: var(--bad); }
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 14px 16px 16px;
+    min-height: 148px;
+  }
+  .card.wide { grid-column: span 4; min-height: 0; }
+  .label {
+    color: var(--muted);
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .value {
+    margin: 6px 0 2px;
+    font-size: 34px;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.03em;
+  }
+  .value small { font-size: 16px; color: var(--muted); font-weight: 400; }
+  .detail { color: var(--muted); font-size: 13px; min-height: 1.4em; }
+  .bar {
+    margin-top: 12px;
+    height: 6px;
+    background: #2a2e36;
+    border-radius: 99px;
+    overflow: hidden;
+  }
+  .bar > span {
+    display: block;
+    height: 100%;
+    width: 0;
+    background: var(--accent);
+    border-radius: 99px;
+  }
+  svg.spark { display: block; width: 100%; height: 36px; margin-top: 10px; }
+  svg.spark polygon { fill: rgba(215, 196, 163, 0.18); }
+  svg.spark polyline { fill: none; stroke: var(--accent); stroke-width: 2; }
+  table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+  th, td {
+    text-align: left;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--line);
+    font-variant-numeric: tabular-nums;
+  }
+  th { color: var(--muted); font-size: 12px; font-weight: 500; }
+  td.num, th.num { text-align: right; }
+  td.name { max-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .banner {
+    display: none;
+    margin-bottom: 12px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: #3a2a28;
+    color: #f0d2cb;
+  }
+  .banner.show { display: block; }
+  @media (max-width: 800px) {
+    .cards { grid-template-columns: 1fr 1fr; }
+    .card.wide { grid-column: span 2; }
+    header { flex-direction: column; }
+    .meta { text-align: left; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <h1 id="title">TV vitals</h1>
+      <div class="sub" id="focus">Waiting for the first sample…</div>
+    </div>
+    <div class="meta">
+      <div><span class="dot" id="dot"></span><span id="status">connecting</span></div>
+      <div id="clock"></div>
+    </div>
+  </header>
+  <div class="banner" id="banner"></div>
+  <section class="cards">
+    <article class="card">
+      <div class="label">CPU</div>
+      <div class="value" id="cpu">—</div>
+      <div class="detail" id="cpu-detail"></div>
+      <svg class="spark" viewBox="0 0 200 36" preserveAspectRatio="none"><polygon id="cpu-fill" points=""></polygon><polyline id="cpu-spark" points=""></polyline></svg>
+    </article>
+    <article class="card">
+      <div class="label">Memory</div>
+      <div class="value" id="mem">—</div>
+      <div class="detail" id="mem-detail"></div>
+      <div class="detail" id="mem-extra"></div>
+      <div class="bar"><span id="mem-bar"></span></div>
+    </article>
+    <article class="card">
+      <div class="label">Storage · /data</div>
+      <div class="value" id="disk">—</div>
+      <div class="detail" id="disk-detail"></div>
+      <div class="bar"><span id="disk-bar"></span></div>
+    </article>
+    <article class="card">
+      <div class="label">Uptime</div>
+      <div class="value" id="up">—</div>
+      <div class="detail" id="up-detail"></div>
+    </article>
+    <article class="card wide">
+      <div class="label">Largest processes · RSS</div>
+      <table>
+        <thead><tr><th>Process</th><th class="num">Memory</th></tr></thead>
+        <tbody id="procs"></tbody>
+      </table>
+    </article>
+  </section>
+</main>
+<script>
+const cpuHist = [];
+const $ = (id) => document.getElementById(id);
+
+function gb(kb) { return (kb / 1048576).toFixed(1) + " GB"; }
+function mb(kb) {
+  const n = kb / 1024;
+  return (n >= 100 ? n.toFixed(0) : n.toFixed(1)) + " MB";
+}
+function uptime(seconds) {
+  const s = Math.round(seconds);
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  if (h > 0) return h + "h " + m + "m";
+  const sec = s % 60;
+  return m > 0 ? m + "m " + sec + "s" : sec + "s";
+}
+function spark(values) {
+  const nums = values.filter((v) => v != null);
+  if (nums.length < 2) return { line: "", fill: "" };
+  const max = Math.max(8, ...nums);
+  const step = 200 / (values.length - 1);
+  const line = values.map((v, i) => {
+    const y = v == null ? 34 : 34 - (v / max) * 32;
+    return (i * step).toFixed(1) + "," + y.toFixed(1);
+  }).join(" ");
+  return { line, fill: "0,34 " + line + " 200,34" };
+}
+
+function render(snap) {
+  const dot = $("dot");
+  if (!snap.ok) {
+    dot.className = "dot bad";
+    $("status").textContent = "no sample";
+    $("banner").textContent = snap.error || "The TV did not answer.";
+    $("banner").className = "banner show";
+    return;
+  }
+  $("banner").className = "banner";
+  const slow = snap.sample_ms > 500;
+  dot.className = slow ? "dot warn" : "dot";
+  const gap = snap.interval_ms == null ? "first sample" : "every " + (snap.interval_ms / 1000).toFixed(2) + "s";
+  $("status").textContent = gap + " · read " + snap.sample_ms + " ms";
+  $("clock").textContent = new Date(snap.ts * 1000).toLocaleTimeString();
+
+  const dev = snap.device || {};
+  const bits = [dev.model, dev.device, dev.android ? "Android " + dev.android : "", dev.firmware]
+    .filter(Boolean);
+  $("title").textContent = bits.length ? bits[0] : "TV vitals";
+  const focus = snap.focus;
+  $("focus").textContent = focus
+    ? "On screen · " + focus.package + (focus.activity ? "  /  " + focus.activity.split(".").pop() : "")
+    : (bits.slice(1).join(" · ") || "No focused window");
+
+  const cpu = snap.cpu_percent;
+  $("cpu").innerHTML = cpu == null ? "—" : cpu.toFixed(1) + "<small> %</small>";
+  const load = (snap.load || []).map((n) => n.toFixed(1)).join("  ");
+  const threads = snap.threads == null ? "" : snap.running + " runnable · " + snap.threads + " threads";
+  $("cpu-detail").textContent = [load ? "load " + load : "", threads].filter(Boolean).join(" · ");
+  cpuHist.push(cpu);
+  if (cpuHist.length > 60) cpuHist.shift();
+  const trace = spark(cpuHist);
+  $("cpu-spark").setAttribute("points", trace.line);
+  $("cpu-fill").setAttribute("points", trace.fill);
+
+  const mem = snap.mem;
+  const memPct = mem.total_kb ? Math.round(100 * mem.used_kb / mem.total_kb) : 0;
+  $("mem").innerHTML = mb(mem.used_kb) + "<small> used</small>";
+  $("mem-detail").textContent = gb(mem.total_kb) + " total · " + mb(mem.available_kb) + " available";
+  $("mem-extra").textContent = mb(mem.free_kb) + " free · cache " + mb(mem.cache_kb) + " · swap " + mb(mem.swap_used_kb);
+  $("mem-bar").style.width = memPct + "%";
+
+  const disk = snap.storage;
+  if (disk) {
+    $("disk").innerHTML = gb(disk.free_kb) + "<small> free</small>";
+    $("disk-detail").textContent = gb(disk.used_kb) + " used of " + gb(disk.total_kb) + " · " + disk.use_percent + "%";
+    $("disk-bar").style.width = disk.use_percent + "%";
+  }
+
+  $("up").textContent = snap.uptime_s == null ? "—" : uptime(snap.uptime_s);
+  const devLine = [dev.android ? "Android " + dev.android : "", dev.firmware].filter(Boolean).join(" · ");
+  $("up-detail").textContent = devLine;
+
+  const body = $("procs");
+  body.replaceChildren();
+  for (const proc of snap.processes || []) {
+    const tr = document.createElement("tr");
+    const name = document.createElement("td");
+    name.className = "name";
+    name.textContent = proc.name;
+    const num = document.createElement("td");
+    num.className = "num";
+    num.textContent = mb(proc.rss_kb);
+    tr.append(name, num);
+    body.append(tr);
+  }
+}
+
+const source = new EventSource("/events");
+source.onmessage = (ev) => render(JSON.parse(ev.data));
+source.onerror = () => {
+  $("dot").className = "dot bad";
+  $("status").textContent = "reconnecting";
+};
+</script>
+</body>
+</html>
