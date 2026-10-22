@@ -2,6 +2,25 @@ plugins {
     id 'com.android.application'
 }
 
+def unsplashAccessKey = ""
+def envFile = new File(rootProject.projectDir.parentFile, ".env")
+if (envFile.isFile()) {
+    envFile.eachLine { rawLine ->
+        def line = rawLine.trim()
+        if (line.isEmpty() || line.startsWith("#") || !line.contains("=")) return
+        int eq = line.indexOf("=")
+        def name = line.substring(0, eq).trim()
+        def value = line.substring(eq + 1).trim()
+        if (value.length() >= 2 && ((value.startsWith('"') && value.endsWith('"'))
+                || (value.startsWith("'") && value.endsWith("'")))) {
+            value = value.substring(1, value.length() - 1)
+        }
+        if ("UNSPLASH_ACCESS_KEY" == name) unsplashAccessKey = value
+        else if ("unsplash_api_key" == name && unsplashAccessKey.isEmpty()) unsplashAccessKey = value
+    }
+}
+def escapedUnsplashKey = unsplashAccessKey.replace("\\", "\\\\").replace("\"", "\\\"")
+
 android {
     namespace 'com.gathin.tvhome'
     compileSdk 34
@@ -13,6 +32,12 @@ android {
         targetSdk 34
         versionCode 8
         versionName 'v2'
+        // Baked from the repo-root .env at build time. Empty when the key is missing: Home still opens.
+        buildConfigField "String", "UNSPLASH_ACCESS_KEY", '"' + escapedUnsplashKey + '"'
+    }
+
+    buildFeatures {
+        buildConfig true
     }
 
     buildTypes {

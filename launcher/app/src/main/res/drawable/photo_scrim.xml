@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Light veil over the Unsplash photo so the white clock and tiles stay readable. Darker at the clock. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <gradient
+        android:angle="270"
+        android:startColor="#8C000000"
+        android:centerColor="#2E000000"
+        android:endColor="#4D000000" />
+</shape>

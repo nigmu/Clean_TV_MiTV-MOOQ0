@@ -5,6 +5,32 @@
     android:layout_height="match_parent"
     android:background="#FF000000">
 
+    <!-- Unsplash stills. Behind the clock, pills and tiles. Empty until a photo is decoded. -->
+    <ImageView
+        android:id="@+id/photoBack"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="centerCrop"
+        android:focusable="false"
+        android:importantForAccessibility="no" />
+
+    <ImageView
+        android:id="@+id/photoFront"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="centerCrop"
+        android:focusable="false"
+        android:importantForAccessibility="no" />
+
+    <View
+        android:id="@+id/photoScrim"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/photo_scrim"
+        android:visibility="gone"
+        android:focusable="false"
+        android:importantForAccessibility="no" />
+
     <!-- Time-of-day backdrop, drawn once a minute (config.xml sky_intensity; 0 keeps it hidden). -->
     <com.gathin.tvhome.SkyView
         android:id="@+id/sky"
@@ -271,12 +297,37 @@
 
             </LinearLayout>
 
+            <!-- Photographer credit for the photo behind Home. Outside leftBlock, so the pills stay level
+                 with the date. Gone until a photo is on screen. -->
+            <TextView
+                android:id="@+id/photoCredit"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_below="@id/leftBlock"
+                android:layout_alignStart="@id/leftBlock"
+                android:layout_marginStart="4dp"
+                android:layout_marginTop="4dp"
+                android:gravity="left"
+                android:singleLine="true"
+                android:ellipsize="end"
+                android:maxWidth="720dp"
+                android:textColor="#E6FFFFFF"
+                android:textSize="13sp"
+                android:fontFamily="@string/font_medium"
+                android:shadowColor="#CC000000"
+                android:shadowDx="0"
+                android:shadowDy="1"
+                android:shadowRadius="6"
+                android:focusable="false"
+                android:focusableInTouchMode="false"
+                android:visibility="gone" />
+
             <!-- Shown only when show_stats is on. Outside leftBlock, so the top buttons stay level with the clock
                  row; gone, it takes no space. -->
             <TextView
                 android:id="@+id/stats"
                 android:layout_width="wrap_content"
-                android:layout_below="@id/leftBlock"
+                android:layout_below="@id/photoCredit"
                 android:layout_alignStart="@id/leftBlock"
                 android:gravity="left"
                 android:layout_height="wrap_content"
