@@ -15,7 +15,6 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 AGENTS = ROOT / "AGENTS.md"
-CI = ROOT / ".github" / "workflows" / "ci.yml"
 GRADLE = ROOT / "launcher" / "app" / "build.gradle"
 
 EXTENSION = re.compile(r"\.(md|py|sh|ps1|yml|yaml|gradle|xml|json|txt|jpg|png|java)$")
@@ -79,34 +78,17 @@ class AgentsPathsTest(unittest.TestCase):
     def test_it_names_paths_at_all(self):
         # A parser that silently finds nothing would make the test above pass for any text.
         paths = [p for _, p in named_paths()]
-        for expected in ("PROMPT.md", "tools/disable.sh", ".github/maintainer/MAINTAINER.md", "examples/README.md"):
+        for expected in ("PROMPT.md", "tools/disable.sh", "docs/TROUBLESHOOTING.md", "examples/README.md"):
             self.assertIn(expected, paths)
 
 
 class AgentsNumbersTest(unittest.TestCase):
-    def test_apk_gate_matches_ci(self):
-        gate = int(re.search(r'test "\$size" -lt (\d+)', CI.read_text(encoding="utf-8")).group(1))
-        stated = re.findall(r"([\d,]+) B \((\d+) KB\)", text())
-        self.assertTrue(stated, "AGENTS.md no longer states the APK gate as 'N B (N KB)'")
-        for size, kb in stated:
-            self.assertEqual(int(size.replace(",", "")), gate, "AGENTS.md and ci.yml disagree on the APK gate")
-            self.assertEqual(int(kb), gate // 1024, "the KB figure next to the gate is wrong")
-
     def test_min_sdk_matches_build_gradle(self):
         min_sdk = re.search(r"^\s*minSdk\s+(\d+)", GRADLE.read_text(encoding="utf-8"), re.M).group(1)
         stated = re.findall(r"minSdk`?\D{0,6}(\d+)", text())
         self.assertTrue(stated, "AGENTS.md no longer states minSdk")
         for value in stated:
             self.assertEqual(value, min_sdk, "AGENTS.md and launcher/app/build.gradle disagree on minSdk")
-
-    def test_commands_are_the_ones_ci_runs(self):
-        ci = CI.read_text(encoding="utf-8")
-        for command in ("python3 -m unittest discover -s tests -v",
-                        "./gradlew --no-daemon testReleaseUnitTest lintRelease assembleRelease",
-                        "CLEANYOURTV_STRICT"):
-            with self.subTest(command=command):
-                self.assertIn(command, ci, "ci.yml changed; update AGENTS.md and this test")
-                self.assertIn(command, text(), "AGENTS.md no longer gives the command CI runs")
 
 
 class AgentsEntryPointsTest(unittest.TestCase):
@@ -117,7 +99,7 @@ class AgentsEntryPointsTest(unittest.TestCase):
                 self.assertIn("@AGENTS.md", [l.strip() for l in lines], f"{name} must import AGENTS.md")
 
     def test_people_docs_point_at_it(self):
-        for name in ("README.md", "CONTRIBUTING.md"):
+        for name in ("README.md",):
             with self.subTest(file=name):
                 self.assertIn("](AGENTS.md)", (ROOT / name).read_text(encoding="utf-8"))
 
