@@ -2,7 +2,7 @@
 
 Xiaomi Mi TV (MiTV-MOOQ0, croods), Android 10, firmware QTG3.200305.006.3270.
 
-The home app is `launcher/` (`com.gathin.tvhome`). Packages are disabled, never uninstalled. The list applied on this set is [work/mitv-mooq0-session.txt](work/mitv-mooq0-session.txt). Restore, the dock, and pushing a theme are in [work/README.md](work/README.md).
+The home app is `launcher/` (`com.gathin.tvhome`). Packages are disabled, never uninstalled. The list applied on this set stays on this computer, in `work/mitv-mooq0-session.txt`. The shared debloat list is [`examples/xiaomi-mitv-mooq0/debloat.txt`](examples/xiaomi-mitv-mooq0/debloat.txt).
 
 The procedure for a coding agent is [PROMPT.md](PROMPT.md). The rules that agent follows are in [AGENTS.md](AGENTS.md). When the set misbehaves, see [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md).
 
