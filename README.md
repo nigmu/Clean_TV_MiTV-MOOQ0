@@ -1,3 +1,5 @@
+https://github.com/nigmu/Clean_TV_MiTV-MOOQ0/raw/main/docs/before-after.mp4
+
 # This TV
 
 Xiaomi Mi TV (MiTV-MOOQ0, croods), Android 10, firmware QTG3.200305.006.3270.
