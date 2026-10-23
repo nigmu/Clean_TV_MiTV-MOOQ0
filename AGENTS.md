@@ -53,7 +53,9 @@ this repository. Start with [README.md](README.md). This file is the rules an ag
   `minSdk` or hand over an APK built elsewhere.
 
 The person's backups (`backup/`), screenshots (`shots/`), notes (`work/`) and the ADB key
-(`tools/adbkey/`) are listed in `.gitignore` and must never be committed. If the person wants to
+(`tools/adbkey/`) are listed in `.gitignore` and must never be committed. The one exception is
+`shots/before-after-60s-white.mp4`, the before-and-after video embedded in `README.md`.
+If the person wants to
 share their TV's list afterwards, follow [Add a TV list](#add-a-tv-list) below.
 
 ## Repo map
@@ -204,5 +206,6 @@ Never do these:
 - Never commit or post TV Settings screenshots that show accounts, email addresses or device names.
 - `tools/tv.py --probe`, `getprop` and backups contain the serial number and device names. Quote only the model,
   Android version and firmware build.
-- Keep session files in `backup/`, `shots/` and `work/`, which git ignores.
+- Keep session files in `backup/`, `shots/` and `work/`, which git ignores. The README's
+  before-and-after video is the only file under `shots/` that is kept.
 - The code is under the repo's MIT licence.

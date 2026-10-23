@@ -9,7 +9,9 @@ launcher/local.properties
 # your own TV's dumps (serial, android_id, device names) stay local
 backup/
 # session screenshots and working notes (may show the Wi-Fi name or account avatar) stay local
-shots/
+# everything under shots/ stays local except the README demo
+shots/*
+!shots/before-after-60s-white.mp4
 work/
 # Perfetto traces from tools/trace.py: large, and they hold the TV's process list
 traces/

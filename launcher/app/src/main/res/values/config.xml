@@ -332,7 +332,7 @@
          topic_submissions keys, and words in alt_description or description; empty lists reject nothing. -->
     <bool name="unsplash_enabled">true</bool>
     <integer name="unsplash_fetch_seconds">15</integer>
-    <integer name="unsplash_display_seconds">60</integer>
+    <integer name="unsplash_display_seconds">20</integer>
     <integer name="unsplash_max_images">50</integer>
     <integer name="unsplash_hourly_cap">50</integer>
     <integer name="unsplash_width">1920</integer>

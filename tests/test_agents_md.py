@@ -29,9 +29,22 @@ def text():
 
 
 def ignored_prefixes():
-    """Folders .gitignore names: they exist on a contributor's machine, not in a clone."""
+    """Folders .gitignore names: they exist on a contributor's machine, not in a clone.
+
+    A trailing slash (`shots/`) and a contents pattern (`shots/*`, `shots/**`) both mean the
+    folder is local. Negation lines (`!shots/before-after-60s-white.mp4`) are the exception and are not prefixes.
+    """
     lines = (ROOT / ".gitignore").read_text(encoding="utf-8").split("\n")
-    return [l.strip().rstrip("/") for l in lines if l.strip().endswith("/") and not l.startswith("#")]
+    prefixes = []
+    for raw in lines:
+        line = raw.strip()
+        if not line or line.startswith("#") or line.startswith("!"):
+            continue
+        if line.endswith("/"):
+            prefixes.append(line.rstrip("/"))
+        elif line.endswith("/*") or line.endswith("/**"):
+            prefixes.append(line.split("*", 1)[0].rstrip("/"))
+    return prefixes
 
 
 def file_names():
