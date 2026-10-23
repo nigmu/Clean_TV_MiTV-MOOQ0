@@ -1,4 +1,4 @@
-https://github.com/nigmu/Clean_TV_MiTV-MOOQ0/raw/main/docs/before-after.mp4
+[![Before and after](docs/before-after.jpg)](docs/before-after.mp4)
 
 # This TV
 
