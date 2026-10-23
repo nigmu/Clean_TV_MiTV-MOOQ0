@@ -2,41 +2,87 @@ package com.gathin.tvhome;
 
 import org.junit.Test;
 
+import java.util.Arrays;
+import java.util.Collections;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
-/** The Unsplash batch: hotlinked URLs, one download ping, and a pace that stays under 50 API calls an hour. */
+/** One Unsplash photo: a single random URL, a PNG, numbered files, and a cap that can say no. */
 public class UnsplashPhotosTest {
     private static final String RAW = "https://images.unsplash.com/photo-abc?ixid=1";
-    private static final String JSON = "[{"
+    private static final String OBJECT = "{"
             + "\"id\":\"abc\","
             + "\"urls\":{\"raw\":\"" + RAW + "\"},"
-            + "\"links\":{\"html\":\"https://unsplash.com/photos/abc\","
-            + "\"download_location\":\"https://api.unsplash.com/photos/abc/download?ixid=1\"},"
+            + "\"links\":{\"html\":\"https://unsplash.com/photos/abc\"},"
             + "\"user\":{\"name\":\"Ada Lovelace\",\"links\":{\"html\":\"https://unsplash.com/@ada\"}}"
-            + "}]";
+            + "}";
+    private static final String NATURE = "{"
+            + "\"id\":\"n1\","
+            + "\"alt_description\":\"A quiet beach\","
+            + "\"description\":\"Waves at dusk\","
+            + "\"topic_submissions\":{\"nature\":{\"status\":\"approved\"},\"wallpapers\":{\"status\":\"approved\"}},"
+            + "\"urls\":{\"raw\":\"https://images.unsplash.com/photo-n1\"},"
+            + "\"user\":{\"name\":\"Ada Lovelace\"}"
+            + "}";
 
-    @Test public void randomRequestIsOneLandscapeBatch() {
-        String url = UnsplashPhotos.randomUrl();
+    @Test public void randomRequestIsOnePhoto() {
+        String url = UnsplashPhotos.randomUrl("6sMVjTLSkeQ", "high");
         assertTrue(url.startsWith("https://api.unsplash.com/photos/random?"));
+        assertTrue(url.contains("topics=6sMVjTLSkeQ"));
         assertTrue(url.contains("orientation=landscape"));
         assertTrue(url.contains("content_filter=high"));
-        assertTrue(url.contains("count=" + UnsplashPhotos.BATCH));
-        assertTrue(UnsplashPhotos.BATCH <= 30);
+        assertFalse(url.contains("count="));
     }
 
-    @Test public void sizedImageKeepsTheApiUrlAndFitsThePanel() {
+    @Test public void sizedImageIsAPngCroppedToThePanel() {
         String sized = UnsplashPhotos.sized(RAW);
         assertTrue(sized.startsWith(RAW + "&"));
         assertTrue(sized.contains("w=1920"));
         assertTrue(sized.contains("h=1080"));
         assertTrue(sized.contains("fit=crop"));
+        assertTrue(sized.contains("fm=png"));
+        assertFalse(sized.contains("fm=jpg"));
         assertTrue(UnsplashPhotos.sized("https://images.unsplash.com/photo-abc")
                 .startsWith("https://images.unsplash.com/photo-abc?w=1920"));
+        assertTrue(UnsplashPhotos.imageHost(sized));
         assertNull(UnsplashPhotos.sized(null));
         assertNull(UnsplashPhotos.sized(""));
+    }
+
+    @Test public void fileNamesUseAtLeastTwoDigits() {
+        assertEquals("01.png", UnsplashPhotos.fileName(1));
+        assertEquals("02.png", UnsplashPhotos.fileName(2));
+        assertEquals("10.png", UnsplashPhotos.fileName(10));
+        assertEquals("51.png", UnsplashPhotos.fileName(51));
+        assertEquals("100.png", UnsplashPhotos.fileName(100));
+        assertEquals(1, UnsplashPhotos.fileNumber("01.png"));
+        assertEquals(51, UnsplashPhotos.fileNumber("51.png"));
+        assertEquals(100, UnsplashPhotos.fileNumber("100.png"));
+        assertEquals(0, UnsplashPhotos.fileNumber("abc.jpg"));
+        assertEquals(1, UnsplashPhotos.nextFileNumber(0));
+        assertEquals(52, UnsplashPhotos.nextFileNumber(51));
+        assertEquals(101, UnsplashPhotos.nextFileNumber(100));
+    }
+
+    @Test public void savingPastTheCapDeletesThatManyBack() {
+        assertEquals(0, UnsplashPhotos.evictNumber(50, 50));
+        assertEquals(1, UnsplashPhotos.evictNumber(51, 50));
+        assertEquals(2, UnsplashPhotos.evictNumber(52, 50));
+        assertEquals("01.png", UnsplashPhotos.fileName(UnsplashPhotos.evictNumber(51, 50)));
+        assertEquals("02.png", UnsplashPhotos.fileName(UnsplashPhotos.evictNumber(52, 50)));
+        assertEquals("50.png", UnsplashPhotos.fileName(UnsplashPhotos.evictNumber(100, 50)));
+    }
+
+    @Test public void displayWalksInNumericOrderAndWraps() {
+        int[] files = {51, 2, 10};
+        assertEquals(2, UnsplashPhotos.nextShown(0, files));
+        assertEquals(10, UnsplashPhotos.nextShown(2, files));
+        assertEquals(51, UnsplashPhotos.nextShown(10, files));
+        assertEquals(2, UnsplashPhotos.nextShown(51, files));
+        assertEquals(0, UnsplashPhotos.nextShown(1, new int[0]));
     }
 
     @Test public void referralUsesTheReturnedPage() {
@@ -49,72 +95,67 @@ public class UnsplashPhotosTest {
         assertNull(UnsplashPhotos.referral(null));
     }
 
-    @Test public void parseReadsThePhotoTheApiReturned() {
-        UnsplashPhotos.Batch batch = UnsplashPhotos.parse(JSON);
-        assertEquals(1, batch.photos.size());
-        UnsplashPhotos.Photo photo = batch.photos.get(0);
+    @Test public void parseReadsTheOnePhotoTheApiReturned() {
+        UnsplashPhotos.Photo photo = UnsplashPhotos.parse(OBJECT);
         assertEquals("abc", photo.id);
         assertTrue(photo.imageUrl.startsWith(RAW + "&"));
         assertTrue(photo.imageUrl.contains("w=1920"));
+        assertTrue(photo.imageUrl.contains("fm=png"));
         assertEquals("Ada Lovelace", photo.photographer);
         assertEquals("https://unsplash.com/@ada?utm_source=tvhome&utm_medium=referral", photo.userLink);
         assertEquals("https://unsplash.com/photos/abc?utm_source=tvhome&utm_medium=referral", photo.photoLink);
-        assertEquals("https://api.unsplash.com/photos/abc/download?ixid=1", photo.downloadLocation);
-        assertFalse(photo.downloadTracked);
         assertEquals("Ada Lovelace  ·  Unsplash", UnsplashPhotos.credit(photo));
+        UnsplashPhotos.Photo first = UnsplashPhotos.parse("[" + OBJECT + "," + OBJECT.replace("abc", "def") + "]");
+        assertEquals("abc", first.id);
     }
 
     @Test public void parseSkipsAPhotoWithNoImageAndRejectsAnErrorBody() {
-        UnsplashPhotos.Batch batch = UnsplashPhotos.parse("[{"
+        UnsplashPhotos.Photo photo = UnsplashPhotos.parse("[{"
                 + "\"id\":\"gone\",\"user\":{\"name\":\"Nobody\"}},"
                 + "{\"id\":\"ok\",\"urls\":{\"raw\":\"https://images.unsplash.com/photo-ok\"},"
-                + "\"links\":{\"html\":\"https://unsplash.com/photos/ok\","
-                + "\"download_location\":\"https://api.unsplash.com/photos/ok/download\"},"
+                + "\"links\":{\"html\":\"https://unsplash.com/photos/ok\"},"
                 + "\"user\":{\"name\":\"\",\"links\":{\"html\":\"https://unsplash.com/@ok\"}}}]");
-        assertEquals(1, batch.photos.size());
-        assertEquals("ok", batch.photos.get(0).id);
-        assertEquals("Unsplash", UnsplashPhotos.credit(batch.photos.get(0)));
+        assertEquals("ok", photo.id);
+        assertEquals("Unsplash", UnsplashPhotos.credit(photo));
         assertNull(UnsplashPhotos.parse("{\"errors\":[\"Rate Limit Exceeded\"]}"));
         assertNull(UnsplashPhotos.parse("not json"));
         assertNull(UnsplashPhotos.parse(null));
     }
 
-    @Test public void batchRefetchesOnlyWhenItRunsOut() {
-        UnsplashPhotos.Batch batch = UnsplashPhotos.parse(JSON);
-        assertFalse(batch.exhausted());
-        assertEquals("abc", batch.current().id);
-        assertFalse(UnsplashPhotos.shouldFetch(batch, 1_000L));
-        batch.advance();
-        assertTrue(batch.exhausted());
-        assertNull(batch.current());
-        assertTrue(UnsplashPhotos.shouldFetch(batch, 1_000L));
-        batch.retryAfter = 5_000L;
-        assertFalse(UnsplashPhotos.shouldFetch(batch, 4_000L));
-        assertTrue(UnsplashPhotos.shouldFetch(batch, 5_000L));
-        assertTrue(UnsplashPhotos.shouldFetch(null, 1_000L));
+    @Test public void rejectMatchesTopicKeysAndDescription() {
+        UnsplashPhotos.Photo photo = UnsplashPhotos.parse(NATURE);
+        assertFalse(UnsplashPhotos.rejected(photo, Collections.emptyList(), Collections.emptyList()));
+        assertTrue(UnsplashPhotos.rejected(photo, Arrays.asList("nature"), Collections.emptyList()));
+        assertFalse(UnsplashPhotos.rejected(photo, Arrays.asList("people"), Collections.emptyList()));
+        assertTrue(UnsplashPhotos.rejected(photo, Collections.emptyList(), Arrays.asList("beach")));
+        assertTrue(UnsplashPhotos.rejected(photo, Collections.emptyList(), Arrays.asList("WAVES")));
+        assertFalse(UnsplashPhotos.rejected(photo, Collections.emptyList(), Arrays.asList("city")));
+        assertFalse(UnsplashPhotos.rejected(null, Arrays.asList("nature"), Arrays.asList("beach")));
     }
 
-    @Test public void downloadLocationIsMarkedOnce() {
-        UnsplashPhotos.Batch batch = UnsplashPhotos.parse(JSON);
-        assertTrue(batch.markDownload("abc"));
-        assertFalse(batch.markDownload("abc"));
-        assertFalse(batch.markDownload("missing"));
+    @Test public void remainingZeroDoesNotFetch() {
+        assertFalse(UnsplashPhotos.shouldFetch(true, "0", 0, 50, 5_000L, 0L));
+        assertFalse(UnsplashPhotos.shouldFetch(true, "0", 0, 50, 1_000L, 5_000L));
+        assertTrue(UnsplashPhotos.shouldFetch(true, "12", 50, 50, 5_000L, 0L));
+        assertFalse(UnsplashPhotos.shouldFetch(false, "12", 0, 50, 5_000L, 0L));
+        assertFalse(UnsplashPhotos.shouldFetch(true, null, 50, 50, 5_000L, 0L));
+        assertTrue(UnsplashPhotos.shouldFetch(true, null, 49, 50, 5_000L, 0L));
+        UnsplashPhotos.State blocked = UnsplashPhotos.State.record(
+                UnsplashPhotos.State.EMPTY, 5_000L, 200, "0", null, 50, 0);
+        assertEquals("0", blocked.remaining);
+        assertFalse(UnsplashPhotos.shouldFetch(true, blocked.remaining, blocked.calls, 50,
+                5_000L, blocked.waitUntilMs));
+        assertTrue(blocked.waitUntilMs > 5_000L);
     }
 
-    @Test public void savedBatchRoundTrips() {
-        UnsplashPhotos.Batch batch = UnsplashPhotos.parse(JSON);
-        batch.advance();
-        batch.retryAfter = 42L;
-        batch.photos.get(0).downloadTracked = true;
-        UnsplashPhotos.Batch loaded = UnsplashPhotos.Batch.load(batch.save());
-        assertEquals(1, loaded.index);
-        assertEquals(42L, loaded.retryAfter);
-        assertEquals("abc", loaded.photos.get(0).id);
-        assertEquals(batch.photos.get(0).imageUrl, loaded.photos.get(0).imageUrl);
-        assertTrue(loaded.photos.get(0).downloadTracked);
-        assertEquals(batch.photos.get(0).downloadLocation, loaded.photos.get(0).downloadLocation);
-        assertNull(UnsplashPhotos.Batch.load(null));
-        assertNull(UnsplashPhotos.Batch.load("nope"));
+    @Test public void counterFileRemembersTheLastNumber() {
+        UnsplashPhotos.State state = new UnsplashPhotos.State(51, 0, 0L, 0L, 0L, null);
+        UnsplashPhotos.State loaded = UnsplashPhotos.State.load(state.save());
+        assertEquals(51, loaded.lastSaved);
+        assertEquals(52, UnsplashPhotos.nextFileNumber(loaded.lastSaved));
+        assertNull(loaded.remaining);
+        assertEquals(0, UnsplashPhotos.State.load(null).lastSaved);
+        assertEquals(0, UnsplashPhotos.State.load("nope").lastSaved);
     }
 
     @Test public void missingKeyDoesNotFetch() {
@@ -124,15 +165,15 @@ public class UnsplashPhotosTest {
         assertTrue(UnsplashPhotos.hasKey("abc"));
     }
 
-    @Test public void rateLimitKeepsTheBatch() {
+    @Test public void rateLimitedStatuses() {
         assertTrue(UnsplashPhotos.rateLimited(403));
         assertTrue(UnsplashPhotos.rateLimited(429));
         assertFalse(UnsplashPhotos.rateLimited(200));
         assertFalse(UnsplashPhotos.rateLimited(500));
-    }
-
-    @Test public void fullBatchStaysUnderTheHourlyLimit() {
-        assertTrue(UnsplashPhotos.SLIDE_MS >= 8_000L);
-        assertTrue(UnsplashPhotos.requestsPerHour() < 50.0);
+        UnsplashPhotos.State blocked = UnsplashPhotos.State.record(
+                UnsplashPhotos.State.EMPTY, 1_000L, 429, null, null, 50, 0);
+        assertTrue(blocked.waitUntilMs > 1_000L);
+        assertFalse(UnsplashPhotos.shouldFetch(true, blocked.remaining, blocked.calls, 50,
+                1_000L, blocked.waitUntilMs));
     }
 }

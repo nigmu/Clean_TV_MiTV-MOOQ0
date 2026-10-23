@@ -54,7 +54,7 @@ final class Config {
     private static final String THEME_SIGNATURE_KEY = "theme_signature";
 
     final List<String> dockApps;
-    /** Grid apps fill the dock slots dock_apps leaves free (config.xml, fill_dock); on by default, false leaves the slots empty. */
+    /** Grid apps fill the dock slots dock_apps leaves free (config.xml, fill_dock). false leaves the slots empty. */
     final boolean fillDock;
     final List<String> hiddenApps;
     /** Packages pre-seeded into the App library's "added" set (config.xml, library_apps); empty by default. */
@@ -185,6 +185,21 @@ final class Config {
     final boolean handleViewInputs;
     /** Hold OK on a tile opens a menu (Move, Remove from Home, App info) instead of App info (config.xml / theme tile_menu). */
     final boolean tileMenu;
+    /**
+     * Unsplash stills behind Home. From config.xml only: the overlay block below never reads these keys,
+     * so a pushed theme cannot turn the fetch off, change the topic, or raise the hourly cap.
+     */
+    final boolean unsplashEnabled;
+    final int unsplashFetchSeconds;
+    final int unsplashDisplaySeconds;
+    final int unsplashMaxImages;
+    final int unsplashHourlyCap;
+    final int unsplashWidth;
+    final int unsplashHeight;
+    final String unsplashContentFilter;
+    final List<String> unsplashTopics;
+    final List<String> unsplashRejectTopics;
+    final List<String> unsplashRejectKeywords;
 
     private Config(List<String> dockApps, boolean fillDock, List<String> hiddenApps, List<String> libraryApps, String liveTvPackage,
                    String liveTvAction, String liveTvInputId, Map<String, String> launchActions, Map<String, String> appLabels,
@@ -198,7 +213,11 @@ final class Config {
                    Festival festival, int[] inputKeycodes, List<String> appKeys, String stockHomeRedirect,
                    List<RaceWeekend.Race> raceCalendar, boolean cinematicHome, boolean ambientGlow, boolean appGlow, int homeIdleClockMinutes,
                    boolean keyFilter, boolean dockGlass, String glowStyle, boolean wallpaperCaptions,
-                   boolean handleViewInputs, boolean tileMenu, boolean dockEvenPadding) {
+                   boolean handleViewInputs, boolean tileMenu, boolean dockEvenPadding,
+                   boolean unsplashEnabled, int unsplashFetchSeconds, int unsplashDisplaySeconds,
+                   int unsplashMaxImages, int unsplashHourlyCap, int unsplashWidth, int unsplashHeight,
+                   String unsplashContentFilter, List<String> unsplashTopics, List<String> unsplashRejectTopics,
+                   List<String> unsplashRejectKeywords) {
         this.handleViewInputs = handleViewInputs;
         this.tileMenu = tileMenu;
         this.inputKeycodes = inputKeycodes;
@@ -271,6 +290,17 @@ final class Config {
         this.dockEvenPadding = dockEvenPadding;
         this.glowStyle = glowStyle(glowStyle);
         this.wallpaperCaptions = wallpaperCaptions;
+        this.unsplashEnabled = unsplashEnabled;
+        this.unsplashFetchSeconds = unsplashFetchSeconds;
+        this.unsplashDisplaySeconds = unsplashDisplaySeconds;
+        this.unsplashMaxImages = unsplashMaxImages;
+        this.unsplashHourlyCap = unsplashHourlyCap;
+        this.unsplashWidth = unsplashWidth;
+        this.unsplashHeight = unsplashHeight;
+        this.unsplashContentFilter = unsplashContentFilter == null ? "high" : unsplashContentFilter;
+        this.unsplashTopics = Collections.unmodifiableList(unsplashTopics);
+        this.unsplashRejectTopics = Collections.unmodifiableList(unsplashRejectTopics);
+        this.unsplashRejectKeywords = Collections.unmodifiableList(unsplashRejectKeywords);
     }
 
     /** A known glow_style, or radial (the default) for anything else. */
@@ -347,6 +377,20 @@ final class Config {
         boolean dockGlass = res.getBoolean(R.bool.dock_glass);
         boolean dockEvenPadding = res.getBoolean(R.bool.dock_even_padding);
         String glowStyle = res.getString(R.string.glow_style);
+        // Unsplash stays on the values above. A theme may change the dock and the look; it must not
+        // retarget the photo request or the hourly cap.
+        boolean unsplashEnabled = res.getBoolean(R.bool.unsplash_enabled);
+        int unsplashFetchSeconds = positive(res.getInteger(R.integer.unsplash_fetch_seconds), 15);
+        int unsplashDisplaySeconds = positive(res.getInteger(R.integer.unsplash_display_seconds), 15);
+        int unsplashMaxImages = positive(res.getInteger(R.integer.unsplash_max_images), 50);
+        int unsplashHourlyCap = positive(res.getInteger(R.integer.unsplash_hourly_cap), 50);
+        int unsplashWidth = positive(res.getInteger(R.integer.unsplash_width), 1920);
+        int unsplashHeight = positive(res.getInteger(R.integer.unsplash_height), 1080);
+        String unsplashContentFilter = res.getString(R.string.unsplash_content_filter).trim();
+        if (unsplashContentFilter.isEmpty()) unsplashContentFilter = "high";
+        List<String> unsplashTopics = new ArrayList<>(Arrays.asList(res.getStringArray(R.array.unsplash_topics)));
+        List<String> unsplashRejectTopics = new ArrayList<>(Arrays.asList(res.getStringArray(R.array.unsplash_reject_topics)));
+        List<String> unsplashRejectKeywords = new ArrayList<>(Arrays.asList(res.getStringArray(R.array.unsplash_reject_keywords)));
         boolean applied = false;
 
         File dir = dir(ctx);
@@ -470,7 +514,14 @@ final class Config {
                 Math.max(0, Math.min(100, skyIntensity)), settingsKeycodes, settingsKeyPanel, restoreKeyServices, wallpaperEnabled, wallpaper,
                 wallpapers, rotationMinutes, wallpaperDim, dockOpacity, wallpaperOrder, applied,
                 festival, inputKeycodes, appKeys, stockHomeRedirect, json == null ? Collections.emptyList() : raceCalendar(json), cinematic, ambientGlow, appGlow,
-                Math.max(0, idleClockMinutes), keyFilter, dockGlass, glowStyle, wallpaperCaptions, handleViewInputs, tileMenu, dockEvenPadding);
+                Math.max(0, idleClockMinutes), keyFilter, dockGlass, glowStyle, wallpaperCaptions, handleViewInputs, tileMenu, dockEvenPadding,
+                unsplashEnabled, unsplashFetchSeconds, unsplashDisplaySeconds, unsplashMaxImages, unsplashHourlyCap,
+                unsplashWidth, unsplashHeight, unsplashContentFilter, unsplashTopics, unsplashRejectTopics,
+                unsplashRejectKeywords);
+    }
+
+    private static int positive(int value, int fallback) {
+        return value > 0 ? value : fallback;
     }
 
     /**

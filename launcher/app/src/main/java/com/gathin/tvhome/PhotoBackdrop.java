@@ -2,9 +2,13 @@ package com.gathin.tvhome;
 
 import android.app.Activity;
 import android.content.ActivityNotFoundException;
+import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.net.ConnectivityManager;
+import android.net.Network;
+import android.net.NetworkCapabilities;
 import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
@@ -16,7 +20,6 @@ import android.text.style.ClickableSpan;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.View;
-import android.view.animation.LinearInterpolator;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.TextView;
@@ -29,58 +32,75 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.util.HashSet;
+import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 
 /**
- * Still photos from Unsplash behind Home. One saved batch is slid through while Home is in front; the next
- * batch is fetched only when this one runs out. Pausing Home stops the fetch and the slide, and drops the
- * decoder thread. Two bitmaps exist only while one photo is sliding off the last.
+ * Still photos from Unsplash behind Home. One loop walks the numbered PNGs already on disk; the other asks
+ * for a single Nature photo and waits until that request has finished before the next. Pausing Home cancels
+ * both and drops the decoder thread. The picture on screen is replaced with a cut, and the thread holds the
+ * next decode only while it is preparing it.
  */
 final class PhotoBackdrop {
-    private static final LinearInterpolator LINEAR = new LinearInterpolator();
-    private static final long RATE_LIMIT_MS = 45 * 60_000L;
-    private static final long RETRY_MS = 15 * 60_000L;
-    private static final int MAX_IMAGE_BYTES = 8 * 1024 * 1024;
-
     private final Activity activity;
     private final FrameLayout root;
-    private ImageView currentView;
-    private ImageView nextView;
+    private final ImageView currentView;
+    private final ImageView nextView;
     private final View scrim;
     private final TextView credit;
     private final String key;
-    private final boolean reducedMotion;
+    private final boolean enabled;
+    private final long fetchMs;
+    private final long displayMs;
+    private final int maxImages;
+    private final int hourlyCap;
+    private final int width;
+    private final int height;
+    private final String topics;
+    private final String contentFilter;
+    private final List<String> rejectTopics;
+    private final List<String> rejectKeywords;
     private final int screenW;
     private final int screenH;
     private final Handler main = new Handler(Looper.getMainLooper());
-    private final Runnable slideTask = this::onSlideDue;
-    private final Runnable retryTask = () -> runWorker(this::refetchThenSlide);
+    private final Runnable displayTask = () -> runWorker(this::advanceDisplay);
+    private final Runnable fetchTask = () -> runWorker(this::fetchOne);
 
     private ExecutorService executor;
     private volatile boolean running;
     private volatile HttpURLConnection inFlight;
-    private UnsplashPhotos.Batch batch;
-    private long retryAfter;
-    /** When the last /photos/random finished, so a batch of bad files cannot ask again immediately. */
-    private long lastFetchMs;
-    private Bitmap shown;
-    private Bitmap incoming;
+    private volatile int shownNumber;
+    private volatile Bitmap shown;
 
-    PhotoBackdrop(Activity activity, FrameLayout root, boolean reducedMotion, String key) {
+    PhotoBackdrop(Activity activity, FrameLayout root, Config cfg, String key) {
         this.activity = activity;
         this.root = root;
-        this.reducedMotion = reducedMotion;
         this.key = key == null ? "" : key.trim();
+        this.enabled = cfg.unsplashEnabled;
+        this.fetchMs = cfg.unsplashFetchSeconds * 1000L;
+        this.displayMs = cfg.unsplashDisplaySeconds * 1000L;
+        this.maxImages = cfg.unsplashMaxImages;
+        this.hourlyCap = cfg.unsplashHourlyCap;
+        this.width = cfg.unsplashWidth;
+        this.height = cfg.unsplashHeight;
+        this.topics = UnsplashPhotos.joinTopics(cfg.unsplashTopics);
+        this.contentFilter = cfg.unsplashContentFilter;
+        this.rejectTopics = cfg.unsplashRejectTopics;
+        this.rejectKeywords = cfg.unsplashRejectKeywords;
         currentView = root.findViewById(R.id.photoBack);
         nextView = root.findViewById(R.id.photoFront);
         scrim = root.findViewById(R.id.photoScrim);
         credit = root.findViewById(R.id.photoCredit);
         DisplayMetrics metrics = activity.getResources().getDisplayMetrics();
-        screenW = metrics.widthPixels > 0 ? metrics.widthPixels : UnsplashPhotos.WIDTH;
-        screenH = metrics.heightPixels > 0 ? metrics.heightPixels : UnsplashPhotos.HEIGHT;
+        screenW = metrics.widthPixels > 0 ? metrics.widthPixels : width;
+        screenH = metrics.heightPixels > 0 ? metrics.heightPixels : height;
+        if (nextView != null) {
+            nextView.setImageBitmap(null);
+            nextView.setTranslationX(0);
+        }
         if (credit != null) {
             credit.setMovementMethod(LinkMovementMethod.getInstance());
             credit.setHighlightColor(0);
@@ -92,37 +112,25 @@ final class PhotoBackdrop {
     }
 
     void start() {
-        if (running || currentView == null) return;
+        if (running || currentView == null || !enabled) return;
         running = true;
         executor = Executors.newSingleThreadExecutor(runnable -> {
             Thread thread = new Thread(runnable, "unsplash");
             thread.setPriority(Thread.NORM_PRIORITY - 1);
             return thread;
         });
-        if (shown != null && batch != null && !batch.exhausted()) {
-            scheduleSlide();
-            runWorker(() -> downloadRest(0));
-            return;
-        }
         runWorker(this::boot);
     }
 
-    /** Home left the screen: no request, no slide, no decoder thread. The photo already up stays. */
+    /** Home left the screen: no request, no swap, no decoder thread. The photo already up stays. */
     void stop() {
         running = false;
-        main.removeCallbacks(slideTask);
-        main.removeCallbacks(retryTask);
+        main.removeCallbacks(displayTask);
+        main.removeCallbacks(fetchTask);
         if (currentView != null) currentView.animate().cancel();
         if (nextView != null) nextView.animate().cancel();
-        if (incoming != null) {
-            if (nextView != null) nextView.setImageBitmap(null);
-            Bitmap extra = incoming;
-            incoming = null;
-            extra.recycle();
-        }
         if (currentView != null) currentView.setTranslationX(0);
         if (nextView != null) nextView.setTranslationX(0);
-        if (batch != null) showCredit(batch.current());
         HttpURLConnection conn = inFlight;
         if (conn != null) conn.disconnect();
         ExecutorService exec = executor;
@@ -134,176 +142,121 @@ final class PhotoBackdrop {
         stop();
         if (shown != null) {
             if (currentView != null) currentView.setImageBitmap(null);
-            shown.recycle();
+            Bitmap gone = shown;
             shown = null;
+            gone.recycle();
         }
     }
 
     private void boot() {
-        batch = readBatch();
-        if (batch != null) retryAfter = Math.max(retryAfter, batch.retryAfter);
-        long now = System.currentTimeMillis();
-        if (UnsplashPhotos.hasKey(key) && now >= retryAfter && UnsplashPhotos.shouldFetch(batch, now)) {
-            UnsplashPhotos.Batch fresh = fetchRandom();
+        migrate();
+        if (!running) return;
+        if (shown == null) advanceDisplay();
+        else main.post(this::scheduleDisplay);
+        if (UnsplashPhotos.hasKey(key)) main.post(this::armFetch);
+    }
+
+    /** The old batch of id-named JPEGs is not a numbered set. Drop it once; deleting it again is a no-op. */
+    private void migrate() {
+        new File(activity.getFilesDir(), "unsplash/batch.txt").delete();
+        File[] files = imageDir().listFiles();
+        if (files == null) return;
+        for (File file : files) {
+            String name = file.getName().toLowerCase(Locale.US);
+            if (name.endsWith(".jpg") || name.endsWith(".jpeg") || name.endsWith(".part")) file.delete();
+        }
+    }
+
+    private void armFetch() {
+        if (!running || !UnsplashPhotos.hasKey(key)) return;
+        runWorker(() -> {
+            long now = System.currentTimeMillis();
+            UnsplashPhotos.State state = UnsplashPhotos.State.roll(readState(), now);
+            long delay = UnsplashPhotos.nextDelay(online(), state, hourlyCap, System.currentTimeMillis(), fetchMs);
+            main.post(() -> scheduleFetch(delay));
+        });
+    }
+
+    private void advanceDisplay() {
+        if (!running) return;
+        int[] numbers = listNumbers();
+        if (numbers.length == 0) return;
+        int cursor = shownNumber;
+        for (int i = 0; i < numbers.length; i++) {
             if (!running) return;
-            if (fresh != null) {
-                deleteUnused(fresh);
-                batch = fresh;
-                persist();
-            } else if (batch == null || batch.exhausted()) {
-                main.post(this::scheduleRetry);
+            int next = UnsplashPhotos.nextShown(cursor, numbers);
+            if (next <= 0) return;
+            if (next == shownNumber && shown != null) {
+                main.post(this::scheduleDisplay);
+                return;
             }
+            Bitmap bitmap = decode(new File(imageDir(), UnsplashPhotos.fileName(next)));
+            if (!running) {
+                if (bitmap != null) bitmap.recycle();
+                return;
+            }
+            if (bitmap != null) {
+                int number = next;
+                UnsplashPhotos.Photo credit = creditFor(number);
+                main.post(() -> cutTo(bitmap, number, credit));
+                return;
+            }
+            cursor = next;
         }
-        if (!running || batch == null || batch.photos.isEmpty()) return;
-        if (batch.exhausted()) {
-            main.post(this::scheduleRetry);
-            return;
-        }
-        int start = batch.index;
-        for (int i = start; i < batch.photos.size(); i++) {
-            if (!running) return;
-            if (!ensure(batch.photos.get(i))) continue;
-            Bitmap bitmap = decode(imageFile(batch.photos.get(i)));
-            if (bitmap == null) continue;
-            int index = i;
-            main.post(() -> showStill(bitmap, index));
-            downloadRest(i + 1);
-            return;
-        }
-        main.post(this::scheduleRetry);
+        main.post(this::scheduleDisplay);
     }
 
-    private void downloadRest(int from) {
-        if (batch == null) return;
-        for (int i = Math.max(0, from); i < batch.photos.size(); i++) {
-            if (!running) return;
-            ensure(batch.photos.get(i));
-        }
-    }
-
-    private void onSlideDue() {
-        if (!running || batch == null) return;
-        int next = batch.index + 1;
-        if (next >= batch.photos.size()) {
-            runWorker(this::refetchThenSlide);
-            return;
-        }
-        runWorker(() -> prepare(next));
-    }
-
-    private void prepare(int index) {
-        if (!running || batch == null || index < 0 || index >= batch.photos.size()) return;
-        UnsplashPhotos.Photo photo = batch.photos.get(index);
-        if (!ensure(photo)) {
-            main.post(() -> skip(index));
-            return;
-        }
-        Bitmap bitmap = decode(imageFile(photo));
-        if (!running) {
+    private void cutTo(Bitmap bitmap, int number, UnsplashPhotos.Photo credit) {
+        if (!running || currentView == null || bitmap == null) {
             if (bitmap != null) bitmap.recycle();
             return;
         }
-        if (bitmap == null) {
-            imageFile(photo).delete();
-            main.post(() -> skip(index));
-            return;
-        }
-        main.post(() -> beginSlide(bitmap, index));
-    }
-
-    private void skip(int index) {
-        if (!running || batch == null) return;
-        if (index + 1 >= batch.photos.size()) {
-            // The files in this batch cannot be shown. Wait, instead of asking the API again in a loop.
-            retryAfter = Math.max(retryAfter, System.currentTimeMillis() + RETRY_MS);
-            batch.retryAfter = Math.max(batch.retryAfter, retryAfter);
-            persist();
-            main.post(this::scheduleRetry);
-            return;
-        }
-        runWorker(() -> prepare(index + 1));
-    }
-
-    private void refetchThenSlide() {
-        if (!running) return;
-        long now = System.currentTimeMillis();
-        if (!UnsplashPhotos.hasKey(key)) return;
-        if (now < waitUntil() || (lastFetchMs != 0 && now - lastFetchMs < RETRY_MS)) {
-            main.post(this::scheduleRetry);
-            return;
-        }
-        UnsplashPhotos.Batch fresh = fetchRandom();
-        if (!running) return;
-        if (fresh == null) {
-            if (retryAfter <= System.currentTimeMillis()) {
-                retryAfter = System.currentTimeMillis() + RETRY_MS;
-                if (batch != null) batch.retryAfter = retryAfter;
-                persist();
-            }
-            main.post(this::scheduleRetry);
-            return;
-        }
-        deleteUnused(fresh);
-        batch = fresh;
-        persist();
-        prepare(0);
-    }
-
-    private void showStill(Bitmap bitmap, int index) {
-        if (!running || batch == null || index < 0 || index >= batch.photos.size()) {
-            bitmap.recycle();
-            return;
-        }
-        batch.index = index;
+        shownNumber = number;
         currentView.setTranslationX(0);
         currentView.setImageBitmap(bitmap);
+        if (nextView != null) nextView.setImageBitmap(null);
         Bitmap previous = shown;
         shown = bitmap;
-        releaseLater(previous);
+        if (previous != null && previous != shown) previous.recycle();
         reveal();
-        showCredit(batch.photos.get(index));
-        ping(batch.photos.get(index));
-        persist();
-        scheduleSlide();
+        showCredit(credit);
+        scheduleDisplay();
     }
 
-    private void beginSlide(Bitmap bitmap, int index) {
-        if (!running || bitmap == null || nextView == null) {
-            if (bitmap != null) bitmap.recycle();
+    private void fetchOne() {
+        if (!running || !UnsplashPhotos.hasKey(key)) return;
+        long now = System.currentTimeMillis();
+        UnsplashPhotos.State state = UnsplashPhotos.State.roll(readState(), now);
+        now = System.currentTimeMillis();
+        boolean connected = online();
+        if (!UnsplashPhotos.shouldFetch(connected, state.remaining, state.calls, hourlyCap, now, state.waitUntilMs)) {
+            long delay = UnsplashPhotos.nextDelay(connected, state, hourlyCap, now, fetchMs);
+            if (delay < 1L) delay = fetchMs;
+            long wait = delay;
+            main.post(() -> scheduleFetch(wait));
             return;
         }
-        int width = root.getWidth() > 0 ? root.getWidth() : screenW;
-        incoming = bitmap;
-        nextView.setTranslationX(width);
-        nextView.setImageBitmap(bitmap);
-        if (batch != null && index >= 0 && index < batch.photos.size()) showCredit(batch.photos.get(index));
-        long duration = reducedMotion ? 90L : UnsplashPhotos.SLIDE_MS;
-        currentView.animate().translationX(-width).setDuration(duration).setInterpolator(LINEAR).start();
-        nextView.animate().translationX(0).setDuration(duration).setInterpolator(LINEAR)
-                .withEndAction(() -> finishSlide(index)).start();
-    }
-
-    private void finishSlide(int index) {
-        if (!running || batch == null) return;
-        currentView.animate().cancel();
-        nextView.animate().cancel();
-        ImageView arrived = nextView;
-        nextView = currentView;
-        currentView = arrived;
-        nextView.setImageBitmap(null);
-        nextView.setTranslationX(0);
-        currentView.setTranslationX(0);
-        Bitmap previous = shown;
-        shown = incoming;
-        incoming = null;
-        releaseLater(previous);
-        if (index >= 0 && index < batch.photos.size()) batch.index = index;
-        reveal();
-        showCredit(batch.current());
-        ping(batch.current());
-        persist();
-        if (batch.exhausted()) runWorker(this::refetchThenSlide);
-        else scheduleSlide();
+        Result result = requestRandom();
+        if (!running && result.status <= 0) return;
+        now = System.currentTimeMillis();
+        int savedNumber = state.lastSaved;
+        boolean saved = false;
+        if (result.status == 200 && result.photo != null
+                && !UnsplashPhotos.rejected(result.photo, rejectTopics, rejectKeywords)) {
+            int number = nextSaveNumber(state);
+            saved = download(result.photo, number);
+            if (saved) savedNumber = number;
+        }
+        UnsplashPhotos.State next = UnsplashPhotos.State.record(state, now, result.status, result.remaining,
+                result.reset, hourlyCap, savedNumber);
+        writeState(next);
+        if (!running) return;
+        long delay = next.waitUntilMs > now ? next.waitUntilMs - now : fetchMs;
+        boolean showNow = saved && shown == null;
+        main.post(() -> {
+            if (showNow) runWorker(this::advanceDisplay);
+            scheduleFetch(delay);
+        });
     }
 
     private void reveal() {
@@ -312,105 +265,72 @@ final class PhotoBackdrop {
         root.setBackground(null);
     }
 
-    private void scheduleSlide() {
-        main.removeCallbacks(slideTask);
-        if (!running || batch == null || batch.exhausted()) return;
-        main.postDelayed(slideTask, UnsplashPhotos.HOLD_MS);
-    }
-
-    private void scheduleRetry() {
+    private void scheduleDisplay() {
         if (!running) return;
-        long wait = waitUntil() - System.currentTimeMillis();
-        if (wait < 5_000L) wait = RETRY_MS;
-        main.removeCallbacks(retryTask);
-        main.postDelayed(retryTask, wait);
+        main.removeCallbacks(displayTask);
+        main.postDelayed(displayTask, displayMs);
     }
 
-    private long waitUntil() {
-        long until = retryAfter;
-        if (batch != null) until = Math.max(until, batch.retryAfter);
-        return until;
+    private void scheduleFetch(long delay) {
+        if (!running || !UnsplashPhotos.hasKey(key)) return;
+        main.removeCallbacks(fetchTask);
+        main.postDelayed(fetchTask, Math.max(0L, delay));
     }
 
-    private void ping(UnsplashPhotos.Photo photo) {
-        if (photo == null || !UnsplashPhotos.hasKey(key)) return;
-        if (photo.downloadLocation == null || !photo.downloadLocation.startsWith("https://")) return;
-        if (System.currentTimeMillis() < waitUntil()) return;
-        runWorker(() -> {
-            if (!running || batch == null) return;
-            if (!batch.markDownload(photo.id)) return;
-            int status = getStatus(photo.downloadLocation);
-            if (status >= 200 && status < 300) {
-                persist();
-                return;
-            }
-            photo.downloadTracked = false;
-            if (UnsplashPhotos.rateLimited(status)) noteRateLimit();
-            else if (status == 404) {
-                photo.downloadTracked = true;
-                persist();
-            }
-        });
-    }
-
-    private void noteRateLimit() {
-        retryAfter = System.currentTimeMillis() + RATE_LIMIT_MS;
-        if (batch != null) batch.retryAfter = retryAfter;
-        persist();
-    }
-
-    private UnsplashPhotos.Batch fetchRandom() {
-        HttpURLConnection conn = null;
+    /** A network that can actually carry the request. No such network: leave the API alone. */
+    private boolean online() {
         try {
-            conn = open(UnsplashPhotos.randomUrl(), true);
-            int status = conn.getResponseCode();
-            lastFetchMs = System.currentTimeMillis();
+            ConnectivityManager cm = (ConnectivityManager) activity.getSystemService(Context.CONNECTIVITY_SERVICE);
+            if (cm == null) return false;
+            for (Network network : cm.getAllNetworks()) {
+                NetworkCapabilities caps = cm.getNetworkCapabilities(network);
+                if (caps != null && caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) return true;
+            }
+        } catch (RuntimeException ignored) {
+            return false;
+        }
+        return false;
+    }
+
+    private Result requestRandom() {
+        HttpURLConnection conn = null;
+        int status = 0;
+        String remaining = null;
+        String reset = null;
+        try {
+            conn = open(UnsplashPhotos.randomUrl(topics, contentFilter), true);
+            status = conn.getResponseCode();
+            remaining = header(conn, "X-Ratelimit-Remaining");
+            reset = header(conn, "X-Ratelimit-Reset");
             if (status != 200) {
-                Log.w("TvHome.Photos", "random photos failed: " + status);
-                if (UnsplashPhotos.rateLimited(status)) noteRateLimit();
-                return null;
+                Log.w("TvHome.Photos", "random photo failed: " + status);
+                return new Result(status, remaining, reset, null);
             }
-            return UnsplashPhotos.parse(readLimited(conn.getInputStream(), 1_048_576));
+            UnsplashPhotos.Photo photo = UnsplashPhotos.parse(
+                    readLimited(conn.getInputStream(), 1_048_576), width, height);
+            return new Result(status, remaining, reset, photo);
         } catch (Exception e) {
-            lastFetchMs = System.currentTimeMillis();
-            if (running) Log.w("TvHome.Photos", "random photos failed: " + e.getClass().getSimpleName()
+            if (running) Log.w("TvHome.Photos", "random photo failed: " + e.getClass().getSimpleName()
                     + (e.getMessage() == null ? "" : ": " + e.getMessage()));
-            return null;
+            return new Result(status, remaining, reset, null);
         } finally {
             done(conn);
         }
     }
 
-    private int getStatus(String url) {
-        HttpURLConnection conn = null;
-        try {
-            conn = open(url, true);
-            int status = conn.getResponseCode();
-            InputStream body = status >= 200 && status < 300 ? conn.getInputStream() : conn.getErrorStream();
-            if (body != null) readLimited(body, 64 * 1024);
-            return status;
-        } catch (Exception e) {
-            return 0;
-        } finally {
-            done(conn);
-        }
-    }
-
-    private boolean ensure(UnsplashPhotos.Photo photo) {
-        File dest = imageFile(photo);
-        if (dest.isFile() && dest.length() > 0) return true;
-        return download(photo, dest);
-    }
-
-    private boolean download(UnsplashPhotos.Photo photo, File dest) {
-        if (!running || photo.imageUrl == null || !photo.imageUrl.startsWith("https://")) return false;
+    private boolean download(UnsplashPhotos.Photo photo, int number) {
+        if (!running || photo == null || !UnsplashPhotos.imageHost(photo.imageUrl)) return false;
+        File dest = new File(imageDir(), UnsplashPhotos.fileName(number));
         File folder = dest.getParentFile();
         if (folder != null) folder.mkdirs();
         File part = new File(folder, dest.getName() + ".part");
         HttpURLConnection conn = null;
+        boolean ok = false;
         try {
             conn = open(photo.imageUrl, false);
             if (conn.getResponseCode() != 200) return false;
+            long length = conn.getContentLengthLong();
+            if (length > UnsplashPhotos.MAX_IMAGE_BYTES) return false;
             try (InputStream in = conn.getInputStream(); OutputStream out = new FileOutputStream(part)) {
                 byte[] buf = new byte[8192];
                 int n;
@@ -418,18 +338,26 @@ final class PhotoBackdrop {
                 while ((n = in.read(buf)) >= 0) {
                     if (!running || Thread.currentThread().isInterrupted()) return false;
                     total += n;
-                    if (total > MAX_IMAGE_BYTES) return false;
+                    if (total > UnsplashPhotos.MAX_IMAGE_BYTES) return false;
                     out.write(buf, 0, n);
                 }
             }
             if (!running) return false;
             if (dest.exists() && !dest.delete()) return false;
-            return part.renameTo(dest);
+            ok = part.renameTo(dest);
+            if (!ok) return false;
+            writeCredit(number, photo);
+            int drop = UnsplashPhotos.evictNumber(number, maxImages);
+            if (drop > 0) {
+                new File(imageDir(), UnsplashPhotos.fileName(drop)).delete();
+                creditFile(drop).delete();
+            }
+            return true;
         } catch (Exception e) {
             return false;
         } finally {
             done(conn);
-            if (!dest.isFile()) part.delete();
+            if (!ok) part.delete();
         }
     }
 
@@ -454,6 +382,13 @@ final class PhotoBackdrop {
         if (inFlight == conn) inFlight = null;
     }
 
+    private static String header(HttpURLConnection conn, String name) {
+        String value = conn.getHeaderField(name);
+        if (value == null) return null;
+        value = value.trim();
+        return value.isEmpty() ? null : value;
+    }
+
     private static String readLimited(InputStream in, int max) throws IOException {
         byte[] buf = new byte[4096];
         int n;
@@ -473,14 +408,14 @@ final class PhotoBackdrop {
             BitmapFactory.Options options = new BitmapFactory.Options();
             options.inJustDecodeBounds = true;
             BitmapFactory.decodeFile(file.getPath(), options);
-            int width = options.outWidth;
-            int height = options.outHeight;
-            if (width <= 0 || height <= 0) return null;
-            int sample = WallpaperSize.sampleSize(width, height, screenW, screenH);
-            if (!WallpaperSize.accepted(width / sample, height / sample)) return null;
+            int srcW = options.outWidth;
+            int srcH = options.outHeight;
+            if (srcW <= 0 || srcH <= 0) return null;
+            int sample = WallpaperSize.sampleSize(srcW, srcH, screenW, screenH);
+            if (!WallpaperSize.accepted(srcW / sample, srcH / sample)) return null;
             options.inJustDecodeBounds = false;
             options.inSampleSize = sample;
-            int[] scale = WallpaperSize.coverScale(width / sample, height / sample, screenW, screenH);
+            int[] scale = WallpaperSize.coverScale(srcW / sample, srcH / sample, screenW, screenH);
             if (scale != null) {
                 options.inScaled = true;
                 options.inDensity = scale[0];
@@ -525,79 +460,127 @@ final class PhotoBackdrop {
         return url != null && url.startsWith("https://");
     }
 
-    private void releaseLater(Bitmap bitmap) {
-        if (bitmap == null || bitmap == shown || bitmap == incoming) return;
-        main.postDelayed(bitmap::recycle, 500);
+    private int nextSaveNumber(UnsplashPhotos.State state) {
+        int last = state == null ? 0 : state.lastSaved;
+        int onDisk = 0;
+        for (int n : listNumbers()) if (n > onDisk) onDisk = n;
+        if (onDisk > last) last = onDisk;
+        return UnsplashPhotos.nextFileNumber(last);
     }
 
-    private void persist() {
-        UnsplashPhotos.Batch snapshot = batch;
-        if (snapshot == null) return;
-        runWorker(() -> writeBatch(snapshot));
+    private int[] listNumbers() {
+        File[] files = imageDir().listFiles();
+        if (files == null || files.length == 0) return new int[0];
+        int[] found = new int[files.length];
+        int count = 0;
+        for (File file : files) {
+            if (!file.isFile() || file.length() <= 0) continue;
+            int number = UnsplashPhotos.fileNumber(file.getName());
+            if (number > 0) found[count++] = number;
+        }
+        int[] out = new int[count];
+        System.arraycopy(found, 0, out, 0, count);
+        return out;
     }
 
-    private void writeBatch(UnsplashPhotos.Batch snapshot) {
+    private void writeCredit(int number, UnsplashPhotos.Photo photo) {
         try {
-            File file = batchFile();
+            File file = creditFile(number);
             File folder = file.getParentFile();
             if (folder != null) folder.mkdirs();
-            String text = snapshot.save();
             try (OutputStream out = new FileOutputStream(file)) {
-                out.write(text.getBytes(StandardCharsets.UTF_8));
+                out.write(UnsplashPhotos.creditLine(photo).getBytes(StandardCharsets.UTF_8));
             }
         } catch (Exception e) {
-            Log.w("TvHome.Photos", "could not save the batch");
+            Log.w("TvHome.Photos", "could not save the credit");
         }
     }
 
-    private UnsplashPhotos.Batch readBatch() {
-        File file = batchFile();
+    private UnsplashPhotos.Photo creditFor(int number) {
+        File file = creditFile(number);
         if (!file.isFile()) return null;
         try {
             byte[] bytes = java.nio.file.Files.readAllBytes(file.toPath());
-            return UnsplashPhotos.Batch.load(new String(bytes, StandardCharsets.UTF_8));
+            String text = new String(bytes, StandardCharsets.UTF_8);
+            int nl = text.indexOf('\n');
+            if (nl >= 0) text = text.substring(0, nl);
+            return UnsplashPhotos.readCredit(text);
         } catch (Exception e) {
             return null;
         }
     }
 
-    private void deleteUnused(UnsplashPhotos.Batch fresh) {
-        File folder = imageDir();
-        File[] files = folder.listFiles();
-        if (files == null) return;
-        HashSet<String> keep = new HashSet<>();
-        for (UnsplashPhotos.Photo photo : fresh.photos) keep.add(fileName(photo.id));
-        for (File file : files) {
-            if (!keep.contains(file.getName())) file.delete();
+    private void writeState(UnsplashPhotos.State state) {
+        if (state == null) return;
+        try {
+            File file = stateFile();
+            File folder = file.getParentFile();
+            if (folder != null) folder.mkdirs();
+            File part = new File(folder, "state.txt.part");
+            try (OutputStream out = new FileOutputStream(part)) {
+                out.write(state.save().getBytes(StandardCharsets.UTF_8));
+            }
+            if (file.exists() && !file.delete()) {
+                part.delete();
+                return;
+            }
+            if (!part.renameTo(file)) part.delete();
+        } catch (Exception e) {
+            Log.w("TvHome.Photos", "could not save the photo counter");
         }
     }
 
-    private File imageFile(UnsplashPhotos.Photo photo) {
-        return new File(imageDir(), fileName(photo.id));
+    private UnsplashPhotos.State readState() {
+        File file = stateFile();
+        if (!file.isFile()) return UnsplashPhotos.State.EMPTY;
+        try {
+            byte[] bytes = java.nio.file.Files.readAllBytes(file.toPath());
+            return UnsplashPhotos.State.load(new String(bytes, StandardCharsets.UTF_8));
+        } catch (Exception e) {
+            return UnsplashPhotos.State.EMPTY;
+        }
     }
 
     private File imageDir() {
         return new File(activity.getFilesDir(), "unsplash/images");
     }
 
-    private File batchFile() {
-        return new File(activity.getFilesDir(), "unsplash/batch.txt");
+    private File creditFile(int number) {
+        return new File(new File(activity.getFilesDir(), "unsplash/credits"),
+                String.format(Locale.US, "%02d.txt", number));
     }
 
-    private static String fileName(String id) {
-        String cleaned = id == null ? "" : id.replaceAll("[^A-Za-z0-9_-]", "_");
-        if (cleaned.isEmpty()) cleaned = "photo";
-        if (cleaned.length() > 80) cleaned = cleaned.substring(0, 80);
-        return cleaned + ".jpg";
+    private File stateFile() {
+        return new File(activity.getFilesDir(), "unsplash/state.txt");
     }
 
     private void runWorker(Runnable job) {
         ExecutorService exec = executor;
         if (!running || exec == null) return;
         try {
-            exec.execute(job);
+            exec.execute(() -> {
+                try {
+                    job.run();
+                } catch (Throwable t) {
+                    Log.w("TvHome.Photos", "photo task failed: " + t);
+                }
+            });
         } catch (RejectedExecutionException ignored) {
             // stop() already shut the thread down
+        }
+    }
+
+    private static final class Result {
+        final int status;
+        final String remaining;
+        final String reset;
+        final UnsplashPhotos.Photo photo;
+
+        Result(int status, String remaining, String reset, UnsplashPhotos.Photo photo) {
+            this.status = status;
+            this.remaining = remaining;
+            this.reset = reset;
+            this.photo = photo;
         }
     }
 

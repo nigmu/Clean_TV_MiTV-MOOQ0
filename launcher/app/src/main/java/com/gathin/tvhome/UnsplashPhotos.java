@@ -1,25 +1,24 @@
 package com.gathin.tvhome;
 
+import java.net.URLEncoder;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 /**
- * One Unsplash batch for the Home backdrop. Image and page URLs are the ones the API returned, with the
- * size and referral parameters added. No Android types, so the batch rules are tested on the JVM.
+ * One Unsplash photo for the Home backdrop. The random request is a single counted call: no {@code count}
+ * parameter, and {@code download_location} is never requested. Image URLs are the ones the API returned, with
+ * the size and PNG parameters added. No Android types, so the rules are tested on the JVM.
  */
 final class UnsplashPhotos {
-    /** Demo apps may ask for at most 30, and each photo's download ping counts toward 50 requests an hour. */
-    static final int BATCH = 30;
     static final int WIDTH = 1920;
     static final int HEIGHT = 1080;
-    /**
-     * Hold, then a slow slide. Thirty photos at this pace, plus one list request and one download ping each,
-     * stay under 50 API calls an hour even when the next batch starts as the previous one ends.
-     */
-    static final long HOLD_MS = 88_000L;
-    static final long SLIDE_MS = 12_000L;
+    /** A 1080p PNG is larger than the old JPEG cap. Anything past this is discarded, not decoded. */
+    static final int MAX_IMAGE_BYTES = 12 * 1024 * 1024;
+    static final long HOUR_MS = 3_600_000L;
 
     private UnsplashPhotos() { }
 
@@ -32,15 +31,48 @@ final class UnsplashPhotos {
         return status == 403 || status == 429;
     }
 
-    static String randomUrl() {
-        return "https://api.unsplash.com/photos/random?orientation=landscape&content_filter=high&count=" + BATCH;
+    /**
+     * One photo. {@code topics} is a comma-separated list of topic ids (Nature is {@code 6sMVjTLSkeQ}).
+     * There is no {@code count} parameter: the body is one object, and the call counts as one.
+     */
+    static String randomUrl(String topics, String contentFilter) {
+        StringBuilder url = new StringBuilder("https://api.unsplash.com/photos/random?");
+        String encodedTopics = encodeTopics(topics);
+        if (!encodedTopics.isEmpty()) url.append("topics=").append(encodedTopics).append('&');
+        String filter = contentFilter == null || contentFilter.trim().isEmpty() ? "high" : contentFilter.trim();
+        url.append("orientation=landscape&content_filter=").append(encode(filter));
+        return url.toString();
     }
 
-    /** The API's own image URL, asked to come back as a 1920x1080 JPEG. */
+    static String joinTopics(List<String> topics) {
+        if (topics == null || topics.isEmpty()) return "";
+        StringBuilder out = new StringBuilder();
+        for (String topic : topics) {
+            if (topic == null) continue;
+            String id = topic.trim();
+            if (id.isEmpty()) continue;
+            if (out.length() > 0) out.append(',');
+            out.append(id);
+        }
+        return out.toString();
+    }
+
+    /** The API's own image URL, asked to come back as a PNG cropped to the panel. */
     static String sized(String imageUrl) {
+        return sized(imageUrl, WIDTH, HEIGHT);
+    }
+
+    static String sized(String imageUrl, int width, int height) {
         if (imageUrl == null || imageUrl.trim().isEmpty()) return null;
+        int w = width > 0 ? width : WIDTH;
+        int h = height > 0 ? height : HEIGHT;
         String sep = imageUrl.contains("?") ? "&" : "?";
-        return imageUrl + sep + "w=" + WIDTH + "&h=" + HEIGHT + "&fit=crop&fm=jpg&q=80";
+        return imageUrl + sep + "w=" + w + "&h=" + h + "&fit=crop&fm=png";
+    }
+
+    /** File bytes are fetched only from Unsplash's image host. That download is not an API call. */
+    static boolean imageHost(String url) {
+        return url != null && url.startsWith("https://images.unsplash.com/");
     }
 
     static String referral(String pageUrl) {
@@ -58,50 +90,174 @@ final class UnsplashPhotos {
         return name + "  \u00B7  Unsplash";
     }
 
-    static double requestsPerHour() {
-        long batchMs = (HOLD_MS + SLIDE_MS) * (long) BATCH;
-        return (1.0 + BATCH) * 3_600_000.0 / (double) batchMs;
+    /** {@code 1} is {@code 01.png}, {@code 51} is {@code 51.png}, {@code 100} is {@code 100.png}. */
+    static String fileName(int number) {
+        return String.format(Locale.US, "%02d.png", number);
     }
 
-    /** True when there is nothing left to show and the rate-limit wait, if any, has passed. */
-    static boolean shouldFetch(Batch batch, long now) {
-        if (batch == null || batch.photos.isEmpty()) return true;
-        if (!batch.exhausted()) return false;
-        return now >= batch.retryAfter;
+    /** The integer in {@code 01.png}, or 0 when the name is not a numbered PNG. */
+    static int fileNumber(String name) {
+        if (name == null || !name.endsWith(".png")) return 0;
+        int digits = name.length() - 4;
+        if (digits < 1) return 0;
+        int value = 0;
+        for (int i = 0; i < digits; i++) {
+            char c = name.charAt(i);
+            if (c < '0' || c > '9') return 0;
+            value = value * 10 + (c - '0');
+            if (value > 1_000_000) return 0;
+        }
+        return value;
+    }
+
+    /** The next file number. A counter that has already moved past 1 stays there; only a fresh folder starts at 1. */
+    static int nextFileNumber(int lastSaved) {
+        return lastSaved < 1 ? 1 : lastSaved + 1;
     }
 
     /**
-     * Photos from a /photos/random body. An error object, or a body with no usable image, is null so the
-     * caller keeps the batch already on screen.
+     * The file number removed when {@code saved} is written, or 0 while the folder is still within
+     * {@code maxImages}. Saving 51 with a cap of 50 removes 1 ({@code 01.png}).
      */
-    static Batch parse(String json) {
+    static int evictNumber(int saved, int maxImages) {
+        if (maxImages < 1 || saved <= maxImages) return 0;
+        return saved - maxImages;
+    }
+
+    /**
+     * The next PNG to put on screen: the lowest number above {@code shown}, or the lowest number when
+     * {@code shown} is already the highest. An empty folder returns 0.
+     */
+    static int nextShown(int shown, int[] numbers) {
+        if (numbers == null || numbers.length == 0) return 0;
+        int lowest = 0;
+        int higher = 0;
+        for (int n : numbers) {
+            if (n <= 0) continue;
+            if (lowest == 0 || n < lowest) lowest = n;
+            if (n > shown && (higher == 0 || n < higher)) higher = n;
+        }
+        if (lowest == 0) return 0;
+        return higher != 0 ? higher : lowest;
+    }
+
+    /**
+     * Whether another /photos/random is allowed. Offline never calls. A remaining count of 0 does not call
+     * until {@code waitUntil} (the reset, or an hour) has passed. With no remaining header, the local count
+     * has to stay under {@code hourlyCap}.
+     */
+    static boolean shouldFetch(boolean online, String remaining, int callsThisHour, int hourlyCap,
+            long now, long waitUntil) {
+        if (!online) return false;
+        if (waitUntil > now) return false;
+        Integer left = parseCount(remaining);
+        if (left != null) {
+            if (left > 0) return true;
+            return waitUntil > 0L && now >= waitUntil;
+        }
+        int cap = hourlyCap > 0 ? hourlyCap : 50;
+        return callsThisHour < cap;
+    }
+
+    /**
+     * Milliseconds before the next attempt. A skip (offline, or the cap) waits out the block; a finished
+     * fetch waits the display-independent interval stored on the state.
+     */
+    static long nextDelay(boolean online, State state, int hourlyCap, long now, long fetchMs) {
+        State current = state == null ? State.EMPTY : state;
+        long interval = fetchMs > 0L ? fetchMs : 15_000L;
+        if (current.waitUntilMs > now) return current.waitUntilMs - now;
+        if (!online) return interval;
+        if (!shouldFetch(true, current.remaining, current.calls, hourlyCap, now, current.waitUntilMs)) {
+            if (current.windowStartMs > 0L) {
+                long end = current.windowStartMs + HOUR_MS;
+                if (end > now) return end - now;
+            }
+            return HOUR_MS;
+        }
+        if (current.fetchedAtMs > 0L && now - current.fetchedAtMs < interval) {
+            return interval - (now - current.fetchedAtMs);
+        }
+        return 0L;
+    }
+
+    /**
+     * True when {@code topic_submissions} keys hit the topic list, or {@code alt_description} / {@code description}
+     * contain a keyword. Empty lists reject nothing. The caller still counts the request.
+     */
+    static boolean rejected(Photo photo, List<String> topics, List<String> keywords) {
+        if (photo == null) return false;
+        if (topics != null) {
+            for (String topic : topics) {
+                if (topic == null) continue;
+                String want = topic.trim();
+                if (want.isEmpty()) continue;
+                for (String key : photo.topics) {
+                    if (want.equals(key)) return true;
+                }
+            }
+        }
+        if (keywords != null) {
+            for (String keyword : keywords) {
+                if (keyword == null) continue;
+                String want = keyword.trim();
+                if (want.isEmpty()) continue;
+                if (contains(photo.altDescription, want) || contains(photo.description, want)) return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * One photo from a /photos/random body. An error object, or a body with no usable image, is null.
+     * An array (the old {@code count} shape) still yields only the first usable photo.
+     */
+    static Photo parse(String json) {
+        return parse(json, WIDTH, HEIGHT);
+    }
+
+    static Photo parse(String json, int width, int height) {
         if (json == null) return null;
         String trimmed = json.trim();
         if (trimmed.isEmpty()) return null;
         try {
             Object value = Json.read(trimmed);
-            List<Photo> photos = new ArrayList<>();
             if (value instanceof List) {
                 for (Object item : (List<?>) value) {
-                    Photo photo = photo(item);
-                    if (photo != null) photos.add(photo);
-                    if (photos.size() == BATCH) break;
+                    Photo photo = photo(item, width, height);
+                    if (photo != null) return photo;
                 }
-            } else {
-                Photo photo = photo(value);
-                if (photo != null) photos.add(photo);
+                return null;
             }
-            return photos.isEmpty() ? null : new Batch(photos, 0, 0L);
+            return photo(value, width, height);
         } catch (RuntimeException e) {
             return null;
         }
     }
 
-    private static Photo photo(Object item) {
+    /** One line beside the PNG: photographer, profile, photo page. Tabs in the text are flattened. */
+    static String creditLine(Photo photo) {
+        if (photo == null) return "";
+        return field(photo.photographer) + "\t" + field(photo.userLink) + "\t" + field(photo.photoLink);
+    }
+
+    static Photo readCredit(String line) {
+        if (line == null) return null;
+        String trimmed = line.trim();
+        if (trimmed.isEmpty()) return null;
+        String[] parts = trimmed.split("\t", -1);
+        String name = parts.length > 0 ? parts[0] : "";
+        String user = parts.length > 1 ? parts[1] : "";
+        String page = parts.length > 2 ? parts[2] : "";
+        if (name.isEmpty() && user.isEmpty() && page.isEmpty()) return null;
+        return new Photo("", "", name, emptyAsNull(user), emptyAsNull(page), "", "", Collections.emptyList());
+    }
+
+    private static Photo photo(Object item, int width, int height) {
         Map<?, ?> object = item instanceof Map ? (Map<?, ?>) item : null;
         if (object == null) return null;
         String id = text(object.get("id")).trim();
-        String image = sized(firstUrl(object.get("urls"), "raw", "full", "regular"));
+        String image = sized(firstUrl(object.get("urls"), "raw", "full", "regular"), width, height);
         if (id.isEmpty() || image == null) return null;
         Object links = object.get("links");
         Object user = object.get("user");
@@ -109,8 +265,20 @@ final class UnsplashPhotos {
         String name = user instanceof Map ? text(((Map<?, ?>) user).get("name")) : "";
         String userPage = userLinks instanceof Map ? text(((Map<?, ?>) userLinks).get("html")) : "";
         String photoPage = links instanceof Map ? text(((Map<?, ?>) links).get("html")) : "";
-        String download = links instanceof Map ? text(((Map<?, ?>) links).get("download_location")) : "";
-        return new Photo(id, image, name, referral(userPage), referral(photoPage), download);
+        return new Photo(id, image, name, referral(userPage), referral(photoPage),
+                text(object.get("alt_description")), text(object.get("description")),
+                topicKeys(object.get("topic_submissions")));
+    }
+
+    private static List<String> topicKeys(Object submissions) {
+        if (!(submissions instanceof Map)) return Collections.emptyList();
+        List<String> keys = new ArrayList<>();
+        for (Object key : ((Map<?, ?>) submissions).keySet()) {
+            if (key == null) continue;
+            String name = String.valueOf(key).trim();
+            if (!name.isEmpty()) keys.add(name);
+        }
+        return keys;
     }
 
     private static String firstUrl(Object urls, String... names) {
@@ -125,6 +293,52 @@ final class UnsplashPhotos {
 
     private static String text(Object value) {
         return value instanceof String ? (String) value : "";
+    }
+
+    private static boolean contains(String text, String keyword) {
+        if (text == null || text.isEmpty() || keyword == null || keyword.isEmpty()) return false;
+        return text.toLowerCase(Locale.US).contains(keyword.toLowerCase(Locale.US));
+    }
+
+    private static String encodeTopics(String topics) {
+        if (topics == null || topics.trim().isEmpty()) return "";
+        StringBuilder out = new StringBuilder();
+        for (String part : topics.split(",")) {
+            String id = part.trim();
+            if (id.isEmpty()) continue;
+            if (out.length() > 0) out.append(',');
+            out.append(encode(id));
+        }
+        return out.toString();
+    }
+
+    /** The Charset overload of URLEncoder.encode arrived in API 33. This set is API 29. */
+    private static String encode(String value) {
+        try {
+            return URLEncoder.encode(value, "UTF-8").replace("+", "%20");
+        } catch (java.io.UnsupportedEncodingException e) {
+            return value;
+        }
+    }
+
+    private static String field(String value) {
+        if (value == null) return "";
+        return value.replace('\t', ' ').replace('\n', ' ').replace('\r', ' ');
+    }
+
+    private static String emptyAsNull(String value) {
+        return value == null || value.isEmpty() ? null : value;
+    }
+
+    private static Integer parseCount(String value) {
+        if (value == null) return null;
+        String trimmed = value.trim();
+        if (trimmed.isEmpty() || "-".equals(trimmed)) return null;
+        try {
+            return Integer.valueOf(trimmed);
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     /** The handful of JSON forms /photos/random uses. Anything else is a bad body, not a photo. */
@@ -282,104 +496,135 @@ final class UnsplashPhotos {
         final String photographer;
         final String userLink;
         final String photoLink;
-        final String downloadLocation;
-        boolean downloadTracked;
+        final String altDescription;
+        final String description;
+        /** Keys of {@code topic_submissions}, as the API spelled them. */
+        final List<String> topics;
 
         Photo(String id, String imageUrl, String photographer, String userLink, String photoLink,
-                String downloadLocation) {
-            this.id = id;
+                String altDescription, String description, List<String> topics) {
+            this.id = id == null ? "" : id;
             this.imageUrl = imageUrl;
             this.photographer = photographer == null ? "" : photographer;
             this.userLink = userLink;
             this.photoLink = photoLink;
-            this.downloadLocation = downloadLocation == null ? "" : downloadLocation;
+            this.altDescription = altDescription == null ? "" : altDescription;
+            this.description = description == null ? "" : description;
+            if (topics == null || topics.isEmpty()) this.topics = Collections.emptyList();
+            else this.topics = Collections.unmodifiableList(new ArrayList<>(topics));
         }
     }
 
-    static final class Batch {
-        final List<Photo> photos;
-        int index;
-        /** Epoch millis before which another /photos/random would only spend the hourly cap. */
-        long retryAfter;
+    /**
+     * {@code unsplash/state.txt}. The first line is the last saved file number and only moves forward.
+     * The rest remembers the hourly window so a restart does not spend the cap again.
+     * A missing {@code X-Ratelimit-Remaining} is stored as {@code -}.
+     */
+    static final class State {
+        static final State EMPTY = new State(0, 0, 0L, 0L, 0L, null);
 
-        Batch(List<Photo> photos, int index, long retryAfter) {
-            this.photos = photos;
-            this.index = index;
-            this.retryAfter = retryAfter;
+        final int lastSaved;
+        final int calls;
+        final long windowStartMs;
+        final long waitUntilMs;
+        final long fetchedAtMs;
+        /** Last {@code X-Ratelimit-Remaining}, or null when that response had no such header. */
+        final String remaining;
+
+        State(int lastSaved, int calls, long windowStartMs, long waitUntilMs, long fetchedAtMs, String remaining) {
+            this.lastSaved = Math.max(0, lastSaved);
+            this.calls = Math.max(0, calls);
+            this.windowStartMs = Math.max(0L, windowStartMs);
+            this.waitUntilMs = Math.max(0L, waitUntilMs);
+            this.fetchedAtMs = Math.max(0L, fetchedAtMs);
+            this.remaining = remaining;
         }
 
-        synchronized boolean exhausted() {
-            return photos.isEmpty() || index >= photos.size();
+        /** Drop a local window that has already ended. A stored remaining header is left as it is. */
+        static State roll(State state, long now) {
+            State current = state == null ? EMPTY : state;
+            if (current.remaining != null) return current;
+            boolean hourGone = current.windowStartMs > 0L && now - current.windowStartMs >= HOUR_MS;
+            boolean waitGone = current.waitUntilMs > 0L && now >= current.waitUntilMs;
+            if (!hourGone && !waitGone) return current;
+            return new State(current.lastSaved, 0, 0L, 0L, current.fetchedAtMs, null);
         }
 
-        synchronized Photo current() {
-            return exhausted() ? null : photos.get(index);
-        }
-
-        synchronized void advance() {
-            if (index < photos.size()) index++;
-        }
-
-        /** True the first time this photo should ping links.download_location. */
-        synchronized boolean markDownload(String id) {
-            if (id == null) return false;
-            for (Photo photo : photos) {
-                if (id.equals(photo.id)) {
-                    if (photo.downloadTracked) return false;
-                    photo.downloadTracked = true;
-                    return true;
-                }
+        /**
+         * Account for one finished request. {@code status} 0 is a connection failure: the cap is unchanged.
+         * {@code savedNumber} is the file just written, or the previous number when nothing was saved.
+         * Remaining 0, 403 and 429 all wait until {@code resetHeader} or an hour from now.
+         */
+        static State record(State prev, long now, int status, String remainingHeader, String resetHeader,
+                int hourlyCap, int savedNumber) {
+            State prior = prev == null ? EMPTY : prev;
+            int last = savedNumber > prior.lastSaved ? savedNumber : prior.lastSaved;
+            if (status <= 0) {
+                long wait = prior.waitUntilMs > now ? prior.waitUntilMs : 0L;
+                return new State(last, prior.calls, prior.windowStartMs, wait, now, prior.remaining);
             }
-            return false;
-        }
-
-        synchronized String save() {
-            StringBuilder out = new StringBuilder();
-            out.append(index).append('\n').append(retryAfter).append('\n');
-            for (Photo photo : photos) {
-                out.append(field(photo.id)).append('\t')
-                        .append(field(photo.imageUrl)).append('\t')
-                        .append(field(photo.photographer)).append('\t')
-                        .append(field(photo.userLink)).append('\t')
-                        .append(field(photo.photoLink)).append('\t')
-                        .append(field(photo.downloadLocation)).append('\t')
-                        .append(photo.downloadTracked ? '1' : '0').append('\n');
+            Integer left = parseCount(remainingHeader);
+            if (left != null) {
+                long wait = (left <= 0 || rateLimited(status)) ? resetAt(now, resetHeader) : 0L;
+                return new State(last, 0, 0L, wait, now, Integer.toString(left));
             }
-            return out.toString();
+            long window = prior.windowStartMs;
+            int calls = prior.calls;
+            if (window <= 0L || now - window >= HOUR_MS) {
+                window = now;
+                calls = 1;
+            } else {
+                calls++;
+            }
+            int cap = hourlyCap > 0 ? hourlyCap : 50;
+            long wait = 0L;
+            if (rateLimited(status) || calls >= cap) {
+                String reset = resetHeader == null ? "" : resetHeader.trim();
+                // No remaining header: the hour is measured from the first call in this window.
+                // A reset header on 403/429 still wins, the same wait as a remaining count of 0.
+                wait = reset.isEmpty() ? window + HOUR_MS : resetAt(now, reset);
+            }
+            return new State(last, calls, window, wait, now, null);
         }
 
-        static Batch load(String text) {
-            if (text == null) return null;
+        String save() {
+            return lastSaved + "\n" + calls + "\n" + windowStartMs + "\n" + waitUntilMs + "\n"
+                    + fetchedAtMs + "\n" + (remaining == null ? "-" : remaining) + "\n";
+        }
+
+        static State load(String text) {
+            if (text == null) return EMPTY;
             String[] lines = text.split("\n", -1);
-            if (lines.length < 2) return null;
+            if (lines.length < 1 || lines[0].trim().isEmpty()) return EMPTY;
             try {
-                int index = Integer.parseInt(lines[0].trim());
-                long retryAfter = Long.parseLong(lines[1].trim());
-                List<Photo> photos = new ArrayList<>();
-                for (int i = 2; i < lines.length; i++) {
-                    if (lines[i].trim().isEmpty()) continue;
-                    String[] parts = lines[i].split("\t", -1);
-                    if (parts.length < 7 || parts[0].isEmpty() || parts[1].isEmpty()) return null;
-                    Photo photo = new Photo(parts[0], parts[1], parts[2], emptyAsNull(parts[3]),
-                            emptyAsNull(parts[4]), parts[5]);
-                    photo.downloadTracked = "1".equals(parts[6].trim());
-                    photos.add(photo);
+                int last = Integer.parseInt(lines[0].trim());
+                int calls = lines.length > 1 && !lines[1].trim().isEmpty() ? Integer.parseInt(lines[1].trim()) : 0;
+                long window = lines.length > 2 && !lines[2].trim().isEmpty() ? Long.parseLong(lines[2].trim()) : 0L;
+                long wait = lines.length > 3 && !lines[3].trim().isEmpty() ? Long.parseLong(lines[3].trim()) : 0L;
+                long fetched = lines.length > 4 && !lines[4].trim().isEmpty() ? Long.parseLong(lines[4].trim()) : 0L;
+                String remaining = null;
+                if (lines.length > 5) {
+                    String raw = lines[5].trim();
+                    if (!raw.isEmpty() && !"-".equals(raw)) remaining = raw;
                 }
-                if (photos.isEmpty()) return null;
-                if (index < 0) index = 0;
-                return new Batch(photos, index, retryAfter);
+                return new State(last, calls, window, wait, fetched, remaining);
             } catch (NumberFormatException e) {
-                return null;
+                return EMPTY;
             }
         }
 
-        private static String field(String value) {
-            if (value == null) return "";
-            return value.replace('\t', ' ').replace('\n', ' ').replace('\r', ' ');
-        }
-
-        private static String emptyAsNull(String value) {
-            return value == null || value.isEmpty() ? null : value;
+        private static long resetAt(long now, String resetHeader) {
+            String raw = resetHeader == null ? null : resetHeader.trim();
+            if (raw != null && !raw.isEmpty()) {
+                try {
+                    long value = Long.parseLong(raw);
+                    long ms = value > 1_000_000_000_000L ? value : value * 1000L;
+                    if (ms > now) return ms;
+                } catch (NumberFormatException ignored) {
+                    // an unreadable reset still waits an hour
+                }
+            }
+            return now + HOUR_MS;
         }
     }
 }

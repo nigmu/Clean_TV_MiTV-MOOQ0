@@ -385,7 +385,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         // the theme's background, so launch looks the same.
         getWindow().setBackgroundDrawable(null);
         wallpaperPlayer = new WallpaperPlayer(this, root, cfg);
-        photos = new PhotoBackdrop(this, root, cfg.reducedMotion, BuildConfig.UNSPLASH_ACCESS_KEY);
+        photos = new PhotoBackdrop(this, root, cfg, BuildConfig.UNSPLASH_ACCESS_KEY);
         sky = findViewById(R.id.sky);
         sky.setIntensity(cfg.skyIntensity);
         glass = findViewById(R.id.glass);
