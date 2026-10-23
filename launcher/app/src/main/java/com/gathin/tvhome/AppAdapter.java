@@ -93,16 +93,30 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
 
     static final float FOCUS_SCALE = 1.10f;
     /** Design size of a tile (dp); tiles shrink from here when the columns don't fit, see tileWidthPx. */
-    static final float DESIGN_W_DP = 180f, DESIGN_H_DP = 101f;
+    /** A step down from 180×101 so the dock and grid tiles read smaller, with the same gap in every column. */
+    static final float DESIGN_W_DP = 152f, DESIGN_H_DP = 85.3f;
+    /** Gap between tiles once the row is pulled into a cluster. Wide columns used to leave about 55dp. */
+    static final float TILE_GAP_DP = 16f;
 
     /**
-     * Tile width for a grid of this inner width: the cell minus room for the focus zoom and the glass
-     * highlight, capped at the design size so 4 columns on a 1080p TV look exactly as before.
+     * Side padding that centers a row of design-size tiles with {@link #TILE_GAP_DP} between them.
+     * A screen too narrow for that cluster keeps {@code minPadPx}.
+     */
+    static int clusterSidePaddingPx(int gridWidthPx, int columns, float density, int minPadPx) {
+        if (gridWidthPx <= 0 || columns <= 0) return minPadPx;
+        int target = columns * (Math.round(DESIGN_W_DP * density) + Math.round(TILE_GAP_DP * density));
+        return Math.max(minPadPx, Math.max(0, (gridWidthPx - target) / 2));
+    }
+
+    /**
+     * Tile width for a grid of this inner width: the design size while the cell still leaves
+     * {@link #TILE_GAP_DP}, otherwise the cell minus room for the focus zoom and the glass highlight.
      */
     static int tileWidthPx(int innerWidthPx, int columns, float density) {
         int design = Math.round(DESIGN_W_DP * density);
         if (innerWidthPx <= 0 || columns <= 0) return design;
         int cell = innerWidthPx / columns;
+        if (cell + 1 >= design + Math.round(TILE_GAP_DP * density)) return design;
         int fit = (int) ((cell - 12 * density) / FOCUS_SCALE);
         return Math.max(Math.round(80 * density), Math.min(design, fit));
     }

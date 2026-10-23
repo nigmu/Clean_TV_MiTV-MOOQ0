@@ -197,6 +197,10 @@
          through it. false (the default) keeps the solid near-black band, or the cinematic shelf's dark glass. Can
          also be set with "dock_glass": true in a theme's config.json. -->
     <bool name="dock_glass">false</bool>
+    <!-- Opacity of that band, in percent (30-100). 40 is 60% transparent, so a photo shows through the
+         near-black fill. 100 is solid. A theme's "dock_opacity" overrides this. The cinematic shelf keeps
+         its own translucent band. -->
+    <integer name="dock_opacity">40</integer>
     <!-- The dock band's padding equals the gap between its tiles on all four sides (as far as the grid's edges leave room),
          so its corners are concentric with the tiles' and the spacing reads even. false (the default) keeps the fixed
          14dp above and below, up to 22dp at the sides and 26dp corners. Can also be set with "dock_even_padding": true in a theme's config.json. -->
@@ -244,7 +248,7 @@
          for bigger tiles when rows_below_dock is 2 or 3. -->
     <bool name="dock_title">true</bool>
 
-    <!-- Tiles per row in the grid; the dock always has this many slots. Tiles are 180dp wide at 4 columns and
+    <!-- Tiles per row in the grid; the dock always has this many slots. Tiles are 152dp wide at 4 columns and
          shrink to fit from 5 up (about 144dp at 5, 117dp at 6 on a 1080p TV). -->
     <integer name="columns">4</integer>
 

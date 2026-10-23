@@ -19,6 +19,17 @@ public class TileFitTest {
     }
 
     @Test
+    public void clusteredRowKeepsTheDesignTileAndTheShortGap() {
+        int width = 1920 - 2 * 56 * 2;   // grid width on a 1080p TV, inside the 56dp page padding
+        int side = AppAdapter.clusterSidePaddingPx(width, 4, D, Math.round(10 * D));
+        int inner = width - 2 * side;
+        int tile = AppAdapter.tileWidthPx(inner, 4, D);
+        assertEquals(Math.round(AppAdapter.DESIGN_W_DP * D), tile);
+        assertEquals(Math.round(AppAdapter.TILE_GAP_DP * D), inner / 4 - tile);
+        assertTrue(side > Math.round(10 * D));
+    }
+
+    @Test
     public void noRowsBelowDockKeepsTheWidthOnlySize() {
         int widthOnly = AppAdapter.tileWidthPx(INNER, 4, D);
         assertEquals(widthOnly, AppAdapter.tileWidthPx(INNER, GRID_H, 4, 0, true, true, D));
@@ -39,8 +50,10 @@ public class TileFitTest {
 
     @Test
     public void oneRowUnderATitledDockFits() {
+        // At the 152dp design size one row under a titled dock fits the width-only tile, so the height
+        // does not shrink it further.
         int w = AppAdapter.tileWidthPx(INNER, GRID_H, 4, 1, true, true, D);
-        assertTrue(w < AppAdapter.tileWidthPx(INNER, 4, D));
+        assertEquals(AppAdapter.tileWidthPx(INNER, 4, D), w);
         assertTrue(height(w, 1, true) <= GRID_H + 2);
     }
 
@@ -66,7 +79,9 @@ public class TileFitTest {
 
     @Test
     public void droppingTheTitleGivesBiggerTiles() {
-        assertTrue(AppAdapter.tileWidthPx(INNER, GRID_H, 4, 1, false, true, D)
-                > AppAdapter.tileWidthPx(INNER, GRID_H, 4, 1, true, true, D));
+        // One row already fits at the design size with the title. Two rows hit the floor while the title
+        // is on, and grow once that room is given back.
+        assertTrue(AppAdapter.tileWidthPx(INNER, GRID_H, 4, 2, false, true, D)
+                > AppAdapter.tileWidthPx(INNER, GRID_H, 4, 2, true, true, D));
     }
 }

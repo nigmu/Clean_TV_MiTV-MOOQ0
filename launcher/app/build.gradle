@@ -30,8 +30,8 @@ android {
         applicationId providers.gradleProperty('launcherApplicationId').getOrElse('com.gathin.tvhome')
         minSdk 26
         targetSdk 34
-        versionCode 9
-        versionName 'v4'
+        versionCode 10
+        versionName 'v5'
         // Baked from the repo-root .env at build time. Empty when the key is missing: Home still opens.
         buildConfigField "String", "UNSPLASH_ACCESS_KEY", '"' + escapedUnsplashKey + '"'
     }

@@ -234,7 +234,7 @@
                             android:format24Hour="HH:mm"
                             android:textColor="#FFFFFFFF"
                             android:textSize="92sp"
-                            android:fontFamily="@string/font_medium"
+                            android:fontFamily="@string/font_regular"
                             android:letterSpacing="-0.04"
                             android:includeFontPadding="false" />
 
@@ -248,8 +248,8 @@
                             android:format12Hour="a"
                             android:format24Hour=""
                             android:textColor="#E6FFFFFF"
-                            android:textSize="22sp"
-                            android:fontFamily="@string/font_bold"
+                            android:textSize="18sp"
+                            android:fontFamily="@string/font_regular"
                             android:letterSpacing="0.06"
                             android:textAllCaps="true" />
                     </LinearLayout>
@@ -269,8 +269,8 @@
                             android:singleLine="true"
                             android:ellipsize="end"
                             android:textColor="#F2FFFFFF"
-                            android:textSize="26sp"
-                            android:fontFamily="@string/font_bold"
+                            android:textSize="18sp"
+                            android:fontFamily="@string/font_regular"
                             android:letterSpacing="0.01"
                             android:includeFontPadding="false"
                             android:visibility="gone" />
@@ -288,8 +288,8 @@
                             android:format12Hour="@string/date_format_home"
                             android:format24Hour="@string/date_format_home"
                             android:textColor="#F2FFFFFF"
-                            android:textSize="32sp"
-                            android:fontFamily="@string/font_bold"
+                            android:textSize="20sp"
+                            android:fontFamily="@string/font_regular"
                             android:letterSpacing="0.01"
                             android:includeFontPadding="false" />
                     </LinearLayout>
@@ -297,8 +297,8 @@
 
             </LinearLayout>
 
-            <!-- Photographer credit for the photo behind Home. Outside leftBlock, so the pills stay level
-                 with the date. Gone until a photo is on screen. -->
+            <!-- Photographer credit for the photo behind Home. Outside leftBlock, under the date.
+                 Gone until a photo is on screen. -->
             <TextView
                 android:id="@+id/photoCredit"
                 android:layout_width="wrap_content"
@@ -346,8 +346,8 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_alignParentEnd="true"
-                android:layout_alignBottom="@id/leftBlock"
-                android:layout_marginBottom="6dp"
+                android:layout_alignTop="@id/leftBlock"
+                android:layout_marginTop="34dp"
                 android:clipChildren="false"
                 android:clipToPadding="false"
                 android:orientation="horizontal">
