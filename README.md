@@ -2,16 +2,9 @@
 
 A small home screen for this Xiaomi Mi TV, plus a list of preloaded packages that can be turned off and put back. The home app is [`launcher/`](launcher/) (`com.gathin.tvhome`). Packages are disabled for user 0. [`tools/restore.ps1`](tools/restore.ps1) (or [`tools/restore.sh`](tools/restore.sh)) puts the same list back.
 
-<p align="center">
-  <video src="shots/before-after-60s-white.mp4" poster="docs/before-after.jpg" width="920" controls playsinline>
-    <a href="shots/before-after-60s-white.mp4"><img src="docs/before-after.jpg" alt="Before and after: stock PatchWall on the left, the replacement home on the right" width="920"></a>
-  </video>
-</p>
+https://github.com/user-attachments/assets/77cdd963-8ade-4535-b4e9-9d78055cdc3e
 
-<p align="center">
-  <a href="shots/before-after-60s-white.mp4"><strong>60-second before and after</strong></a><br>
-  Stock PatchWall, then the replacement home on this set.
-</p>
+60-second before and after: stock PatchWall, then the replacement home on this set. The file in the repo is [`shots/before-after-60s-white.mp4`](shots/before-after-60s-white.mp4).
 
 The procedure for a coding agent is [PROMPT.md](PROMPT.md). The rules that agent follows are in [AGENTS.md](AGENTS.md). When the set misbehaves, see [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md).
 

@@ -54,7 +54,7 @@ this repository. Start with [README.md](README.md). This file is the rules an ag
 
 The person's backups (`backup/`), screenshots (`shots/`), notes (`work/`) and the ADB key
 (`tools/adbkey/`) are listed in `.gitignore` and must never be committed. The one exception is
-`shots/before-after-60s-white.mp4`, the before-and-after video embedded in `README.md`.
+`shots/before-after-60s-white.mp4`. GitHub's README player uses the uploaded copy of that file, not a `<video>` tag.
 If the person wants to
 share their TV's list afterwards, follow [Add a TV list](#add-a-tv-list) below.
 
